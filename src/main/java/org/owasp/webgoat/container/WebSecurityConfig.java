@@ -73,7 +73,8 @@ public class WebSecurityConfig {
                     .ignoringRequestMatchers(
                         CsrfExemptions.headerlessAuthentication("/login", "/register.mvc"),
                         CsrfExemptions.post(
-                            "/PasswordReset/ForgotPassword/create-password-reset-link")))
+                            "/PasswordReset/ForgotPassword/create-password-reset-link",
+                            "/SpoofCookie/login")))
         .addFilterAfter(new CsrfTokenCookieFilter(), CsrfFilter.class)
         .exceptionHandling(
             handling ->
