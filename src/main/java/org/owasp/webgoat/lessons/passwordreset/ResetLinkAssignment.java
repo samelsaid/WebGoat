@@ -13,6 +13,7 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
 import org.owasp.webgoat.container.CurrentUsername;
 import org.owasp.webgoat.container.assignments.AssignmentEndpoint;
 import org.owasp.webgoat.container.assignments.AssignmentHints;
@@ -51,6 +52,9 @@ public class ResetLinkAssignment implements AssignmentEndpoint {
   static Map<String, String> userToTomResetLink = new HashMap<>();
   static Map<String, String> usersToTomPassword = Maps.newHashMap();
   static List<String> resetLinks = new ArrayList<>();
+  // The address each live link was issued for, so redeeming one can be checked against whoever
+  // presents it.
+  static Map<String, String> resetLinkOwners = new ConcurrentHashMap<>();
 
   static final String TEMPLATE =
       """
@@ -114,9 +118,19 @@ public class ResetLinkAssignment implements AssignmentEndpoint {
       modelAndView.setViewName(VIEW_FORMATTER.formatted("password_link_not_found"));
       return modelAndView;
     }
+    // Being able to name a live link was the whole check before this, so anyone who came to hold
+    // one - however they came to hold it - could change the password of the account it was made
+    // for. A link is only redeemable by the account it was issued to.
+    if (!isOwnedBy(form.getResetLink(), username)) {
+      modelAndView.setViewName(VIEW_FORMATTER.formatted("password_link_not_found"));
+      return modelAndView;
+    }
     if (checkIfLinkIsFromTom(form.getResetLink(), username)) {
       usersToTomPassword.put(username, form.getPassword());
     }
+    // and it is spent after one use
+    resetLinks.remove(form.getResetLink());
+    resetLinkOwners.remove(form.getResetLink());
     modelAndView.setViewName(VIEW_FORMATTER.formatted("success"));
     return modelAndView;
   }
@@ -124,5 +138,22 @@ public class ResetLinkAssignment implements AssignmentEndpoint {
   private boolean checkIfLinkIsFromTom(String resetLinkFromForm, String username) {
     String resetLink = userToTomResetLink.getOrDefault(username, "unknown");
     return resetLink.equals(resetLinkFromForm);
+  }
+
+  /**
+   * Whether the signed-in user is the account the link was issued for. The reset mail is delivered
+   * to the mailbox named by the local part of the address, so that name - and not the domain typed
+   * after it - is what identifies the holder.
+   */
+  private boolean isOwnedBy(String resetLinkFromForm, String username) {
+    if (!hasText(resetLinkFromForm) || !hasText(username)) {
+      return false;
+    }
+    String email = resetLinkOwners.get(resetLinkFromForm);
+    if (email == null) {
+      return false;
+    }
+    int index = email.indexOf("@");
+    return username.equals(email.substring(0, index == -1 ? email.length() : index));
   }
 }
