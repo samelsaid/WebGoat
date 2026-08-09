@@ -14,6 +14,8 @@ import java.util.Collections;
 import java.util.Enumeration;
 import java.util.Locale;
 import java.util.Set;
+import java.util.stream.Collectors;
+import java.util.stream.Stream;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpHeaders;
 import org.springframework.stereotype.Component;
@@ -44,15 +46,21 @@ public class CanonicalHostFilter extends OncePerRequestFilter {
       @Value("${webgoat.host}") String host, @Value("${webgoat.port}") String port) {
     this.canonicalHost = host + ":" + port;
     // Anything that legitimately addresses this application: the configured origin, the loopback
-    // names, and the same host without an explicit port.
+    // names, and the same host without an explicit port. Collected through a stream rather than
+    // Set.of, because the configured host is itself usually a loopback name and Set.of rejects
+    // duplicate elements at construction.
     this.allowed =
-        Set.of(
-            canonicalHost.toLowerCase(Locale.ROOT),
-            host.toLowerCase(Locale.ROOT),
-            "localhost",
-            "localhost:" + port,
-            "127.0.0.1",
-            "127.0.0.1:" + port);
+        Stream.of(
+                canonicalHost,
+                host,
+                "localhost",
+                "localhost:" + port,
+                "127.0.0.1",
+                "127.0.0.1:" + port,
+                "[::1]",
+                "[::1]:" + port)
+            .map(value -> value.toLowerCase(Locale.ROOT))
+            .collect(Collectors.toUnmodifiableSet());
   }
 
   @Override
@@ -60,11 +68,19 @@ public class CanonicalHostFilter extends OncePerRequestFilter {
       HttpServletRequest request, HttpServletResponse response, FilterChain chain)
       throws ServletException, IOException {
     String host = request.getHeader(HttpHeaders.HOST);
+    /*
+     * Only the socket the request actually arrived on can be trusted here.
+     *
+     * getServerName() and getServerPort() are derived from this very header, so comparing the
+     * header against them always matches and the check does nothing - a request claiming port 9090
+     * makes getServerPort() report 9090. getLocalPort() is the listener the connection landed on
+     * and cannot be influenced by the client.
+     */
     boolean spoofed =
         host != null
             && !allowed.contains(host.toLowerCase(Locale.ROOT))
-            && !host.equalsIgnoreCase(request.getLocalName() + ":" + request.getLocalPort())
-            && !host.equalsIgnoreCase(request.getServerName() + ":" + request.getServerPort());
+            && !host.equalsIgnoreCase(request.getLocalAddr() + ":" + request.getLocalPort())
+            && !host.equalsIgnoreCase(request.getLocalName() + ":" + request.getLocalPort());
     chain.doFilter(spoofed ? new CanonicalHost(request, canonicalHost) : request, response);
   }
 
