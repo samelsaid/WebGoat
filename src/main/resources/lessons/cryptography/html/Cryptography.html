@@ -10,7 +10,8 @@ function initialise() {
 	$("#sha256token").load('crypto/hashing/sha256');
 	$("#md5token").load('crypto/hashing/md5');
 	$("#basicauthtoken").load('crypto/encoding/basic');
-	$("#privatekey").load('crypto/signing/getprivate');
+	// the key is asked for with a POST, so a bare URL cannot hand out private key material
+	$("#privatekey").load('crypto/signing/getprivate', {});
 }
 $(document).ready(initialise);
 </script>
