@@ -94,10 +94,15 @@ public class ResetLinkAssignment implements AssignmentEndpoint {
     if (current != null && MessageDigest.isEqual(current.getBytes(UTF_8), password.getBytes(UTF_8))) {
       return success(this).build();
     }
-    if (TOM_EMAIL.equals(email)) {
-      return failed(this).feedback("login_failed").build();
-    }
-    return failed(this).feedback("login_failed.tom").build();
+    /*
+     * One answer for every address that does not sign in.
+     *
+     * This used to answer differently depending on whether the address was the shop account: one
+     * feedback key for tom@webgoat-cloud.org and another for everything else. That difference is
+     * an oracle - it tells a caller which addresses have accounts here without ever signing in to
+     * one - and on a sign-in endpoint that is the disclosure, not a detail of the wording.
+     */
+    return failed(this).feedback("login_failed").build();
   }
 
   /**
