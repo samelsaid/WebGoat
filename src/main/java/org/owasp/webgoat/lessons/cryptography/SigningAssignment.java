@@ -57,13 +57,6 @@ public class SigningAssignment implements AssignmentEndpoint {
     String tempModulus =
         modulus; /* used to validate the modulus of the public key but might need to be corrected */
     KeyPair keyPair = (KeyPair) request.getSession().getAttribute("keyPair");
-    if (keyPair == null) {
-      // No key has been handed to this session yet, so there is nothing to verify against.
-      // Dereferencing it threw out of the handler instead, which turns a request arriving in the
-      // wrong order - or one sent directly, without loading the page first - into a 500 and an
-      // error page rather than an answer.
-      return failed(this).feedback("crypto-signing.modulusnotok").build();
-    }
     RSAPublicKey rsaPubKey = (RSAPublicKey) keyPair.getPublic();
     if (tempModulus.length() == 512) {
       tempModulus = "00".concat(tempModulus);
