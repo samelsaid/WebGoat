@@ -24,12 +24,6 @@ public class EncodingAssignment implements AssignmentEndpoint {
 
   private static final SecureRandom RANDOM = new SecureRandom();
 
-  /*
-   * Base64 hides nothing: anybody holding the response can decode the header back into the
-   * credential. What is sent out is a placeholder, the generated password stays on the session.
-   */
-  private static final String PLACEHOLDER_HEADER = getBasicAuth("redacted", "redacted");
-
   public static String getBasicAuth(String username, String password) {
     return Base64.getEncoder().encodeToString(username.concat(":").concat(password).getBytes());
   }
@@ -44,7 +38,14 @@ public class EncodingAssignment implements AssignmentEndpoint {
       basicAuth = getBasicAuth(username, randomPassword());
       request.getSession().setAttribute("basicAuth", basicAuth);
     }
-    return "Authorization: Basic ".concat(PLACEHOLDER_HEADER);
+    /*
+     * The header this exercise asks the reader to decode is its own input, so it is still handed
+     * out. What was actually wrong here is where the password came from: it used to be one of five
+     * dictionary words, so decoding the header yielded a credential worth replaying. It is drawn
+     * from a CSPRNG per session now and authenticates nothing outside this lesson, which leaves the
+     * point intact - base64 is an encoding, not protection - with nothing reusable behind it.
+     */
+    return "Authorization: Basic ".concat(basicAuth);
   }
 
   private static String randomPassword() {

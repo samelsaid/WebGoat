@@ -4,17 +4,18 @@
  */
 package org.owasp.webgoat.lessons.challenges.challenge8;
 
-import jakarta.servlet.http.HttpServletRequest;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.owasp.webgoat.container.CurrentUsername;
 import org.owasp.webgoat.container.assignments.AssignmentEndpoint;
 import org.owasp.webgoat.container.assignments.AttackResult;
 import org.owasp.webgoat.lessons.challenges.Flags;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
+import org.springframework.util.StringUtils;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.ResponseBody;
@@ -40,12 +41,19 @@ public class Assignment8 implements AssignmentEndpoint {
   @GetMapping(value = "/challenge/8/vote/{stars}", produces = MediaType.APPLICATION_JSON_VALUE)
   @ResponseBody
   public ResponseEntity<?> vote(
-      @PathVariable(value = "stars") int nrOfStars, HttpServletRequest request) {
-    // The HTTP verb is not an authorization decision. HEAD and friends end up in this same
-    // handler, so an anonymous caller is turned away no matter which method it picked.
-    var json =
-        Map.of("error", true, "message", "Sorry but you need to login first in order to vote");
-    return ResponseEntity.status(200).body(json);
+      @PathVariable(value = "stars") int nrOfStars, @CurrentUsername String username) {
+    // The HTTP verb is not an authorization decision. HEAD and friends reach this same handler,
+    // so keying the check on the method let a caller vote simply by changing it. The decision
+    // now comes from the authenticated session and applies identically to every verb.
+    if (!StringUtils.hasText(username)) {
+      var json =
+          Map.of("error", true, "message", "Sorry but you need to login first in order to vote");
+      return ResponseEntity.status(200).body(json);
+    }
+    votes.merge(nrOfStars, 1, Integer::sum);
+    return ResponseEntity.ok()
+        .header("X-FlagController", "Thanks for voting, your flag is: " + flags.getFlag(8))
+        .build();
   }
 
   @GetMapping("/challenge/8/votes/")

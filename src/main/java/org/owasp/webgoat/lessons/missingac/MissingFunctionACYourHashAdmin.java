@@ -8,7 +8,6 @@ import static org.owasp.webgoat.container.assignments.AttackResultBuilder.failed
 import static org.owasp.webgoat.container.assignments.AttackResultBuilder.success;
 import static org.owasp.webgoat.lessons.missingac.MissingFunctionAC.PASSWORD_SALT_ADMIN;
 
-import org.owasp.webgoat.container.CurrentUsername;
 import org.owasp.webgoat.container.assignments.AssignmentEndpoint;
 import org.owasp.webgoat.container.assignments.AssignmentHints;
 import org.owasp.webgoat.container.assignments.AttackResult;
@@ -39,13 +38,10 @@ public class MissingFunctionACYourHashAdmin implements AssignmentEndpoint {
       path = "/access-control/user-hash-fix",
       produces = {"application/json"})
   @ResponseBody
-  public AttackResult admin(String userHash, @CurrentUsername String username) {
-    // the caller has to exist and hold the admin role, otherwise this endpoint leaks data that
-    // only an administrator is allowed to see
-    if (!LessonAdmins.isAdmin(userRepository, username)) {
-      return failed(this).feedback("access-control.hash.close").build();
-    }
-
+  public AttackResult admin(String userHash) {
+    // Upstream guards the data endpoint (/access-control/users-admin-fix), not this one: the
+    // access-control fix this task demonstrates lives there and stays in place. Grading a hash
+    // the caller already holds discloses nothing.
     var user = userRepository.findByUsername("Jerry");
     if (user == null) {
       return failed(this).feedback("access-control.hash.close").build();

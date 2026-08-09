@@ -12,6 +12,7 @@ import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.SQLException;
 import java.util.HexFormat;
+import java.util.concurrent.atomic.AtomicBoolean;
 import org.owasp.webgoat.container.LessonDataSource;
 import org.owasp.webgoat.container.assignments.AssignmentEndpoint;
 import org.owasp.webgoat.container.assignments.AttackResult;
@@ -25,6 +26,7 @@ public class SqlInjectionChallengeLogin implements AssignmentEndpoint {
   private static final String DEFAULT_USER = "tom";
   private static final String DEFAULT_PASSWORD = "thisisasecretfortomonly";
   private static final SecureRandom RANDOM = new SecureRandom();
+  private static final AtomicBoolean SHIPPED_PASSWORD_ROTATED = new AtomicBoolean(false);
 
   private final LessonDataSource dataSource;
 
@@ -60,10 +62,17 @@ public class SqlInjectionChallengeLogin implements AssignmentEndpoint {
     }
   }
 
-  // The seed data for this lesson carries a plaintext password that is printed in the lesson
-  // itself. It is swapped for a fresh random value on every attempt, so neither the published
-  // default nor a value someone read out earlier still opens the account.
+  /**
+   * The seed data for this lesson carries a plaintext password that the lesson text itself prints,
+   * so it is replaced by a random one the first time this endpoint is used. Once is enough and once
+   * is what is correct: re-drawing it on every attempt meant the stored password changed underneath
+   * the very request that was checking it, so no password could ever match, and every login attempt
+   * - including a failed one from an anonymous caller - turned into a database write.
+   */
   private void rotateShippedPassword(Connection connection) {
+    if (!SHIPPED_PASSWORD_ROTATED.compareAndSet(false, true)) {
+      return;
+    }
     try (PreparedStatement statement =
         connection.prepareStatement(
             "update sql_challenge_users set password = ? where userid = ?")) {
@@ -73,7 +82,8 @@ public class SqlInjectionChallengeLogin implements AssignmentEndpoint {
       statement.setString(2, DEFAULT_USER);
       statement.executeUpdate();
     } catch (SQLException e) {
-      // leave the stored value alone if the update does not go through
+      // leave the stored value alone, and allow a later attempt to try the rotation again
+      SHIPPED_PASSWORD_ROTATED.set(false);
     }
   }
 }
