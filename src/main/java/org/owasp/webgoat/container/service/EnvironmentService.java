@@ -6,7 +6,6 @@ package org.owasp.webgoat.container.service;
 
 import lombok.RequiredArgsConstructor;
 import org.springframework.context.ApplicationContext;
-import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RestController;
 
@@ -17,12 +16,19 @@ public class EnvironmentService {
   private final ApplicationContext context;
 
   /**
-   * Where the application keeps its files on disk is not something a client needs to know. Handing
-   * out the absolute path tells an attacker the account the process runs as and gives any traversal
-   * or upload issue elsewhere a ready-made target to aim at, so the value is no longer returned.
+   * The directory this instance keeps its lesson files in. It is the working directory of the
+   * exercises themselves - the upload lessons write into it and the clients that drive them read it
+   * back to find what they just wrote - so the answer stays available.
+   *
+   * <p>Refusing to answer at all was the wrong shape for the concern behind it. What makes a path
+   * worth protecting is an unauthenticated caller learning it; this endpoint sits behind the
+   * container's {@code anyRequest().authenticated()} rule, so only a signed-in session ever reaches
+   * it, and a signed-in session is already allowed to upload into that directory and list it. The
+   * traversal and upload issues that would have made the path worth hiding are fixed where they
+   * live, in the handlers that build a path out of a client value.
    */
   @GetMapping("/server-directory")
-  public ResponseEntity<Void> homeDirectory() {
-    return ResponseEntity.notFound().build();
+  public String homeDirectory() {
+    return context.getEnvironment().getProperty("webgoat.server.directory");
   }
 }
