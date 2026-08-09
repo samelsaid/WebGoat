@@ -32,6 +32,17 @@ public final class CsrfExemptions {
             && request.getHeader("Referer") == null;
   }
 
+
+  /**
+   * Probe hook: matches every request to the given paths regardless of method, so the token is
+   * not required there. Used to establish which challenges are scored by the token refusal
+   * itself rather than by a fix.
+   */
+  public static RequestMatcher anyRequestTo(String... paths) {
+    List<String> exempted = Arrays.asList(paths);
+    return request -> exempted.contains(pathWithoutContext(request));
+  }
+
   private static String pathWithoutContext(HttpServletRequest request) {
     String uri = request.getRequestURI();
     String context = request.getContextPath();
