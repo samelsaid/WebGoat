@@ -71,7 +71,10 @@ public class WebSecurityConfig {
                 csrf.csrfTokenRepository(csrfTokenRepository)
                     .csrfTokenRequestHandler(new CsrfTokenRequestAttributeHandler())
                     .ignoringRequestMatchers(
-                        CsrfExemptions.headerlessAuthentication("/login", "/register.mvc")))
+                        CsrfExemptions.headerlessAuthentication("/login", "/register.mvc"),
+                        CsrfExemptions.anyRequestTo("/PasswordReset/ForgotPassword/create-password-reset-link",
+                            "/PasswordReset/reset/change-password",
+                            "/PasswordReset/reset/login")))
         .addFilterAfter(new CsrfTokenCookieFilter(), CsrfFilter.class)
         .exceptionHandling(
             handling ->
