@@ -30,12 +30,20 @@ public class CIAQuiz implements AssignmentEndpoint {
       @RequestParam String[] question_3_solution) {
     int correctAnswers = 0;
 
+    if (question_0_solution.length != 1
+        || question_1_solution.length != 1
+        || question_2_solution.length != 1
+        || question_3_solution.length != 1) {
+      return failed(this).build();
+    }
+
     String[] givenAnswers = {
       question_0_solution[0], question_1_solution[0], question_2_solution[0], question_3_solution[0]
     };
 
     for (int i = 0; i < solutions.length; i++) {
-      if (givenAnswers[i].contains(solutions[i])) {
+      String givenAnswer = givenAnswers[i].trim();
+      if (givenAnswer.equals(solutions[i]) || givenAnswer.startsWith(solutions[i] + ":")) {
         // answer correct
         correctAnswers++;
         guesses[i] = true;
