@@ -88,10 +88,19 @@ public class ResetLinkAssignment implements AssignmentEndpoint {
     return failed(this).feedback("login_failed.tom").build();
   }
 
+  /**
+   * Ownership is checked when the page is requested, not only when the change is submitted.
+   *
+   * <p>Asking merely whether the token appears in the global list of outstanding links renders
+   * another account's password-change form to whoever presents its token, and this is a GET, so
+   * nothing else in the application stands in front of it. The form is itself the disclosure that
+   * the token is live and whose it is.
+   */
   @GetMapping("/PasswordReset/reset/reset-password/{link}")
-  public ModelAndView resetPassword(@PathVariable(value = "link") String link, Model model) {
+  public ModelAndView resetPassword(
+      @PathVariable(value = "link") String link, Model model, @CurrentUsername String username) {
     ModelAndView modelAndView = new ModelAndView();
-    if (ResetLinkAssignment.resetLinks.contains(link)) {
+    if (isOwnedBy(link, username)) {
       PasswordChangeForm form = new PasswordChangeForm();
       form.setResetLink(link);
       model.addAttribute("form", form);
