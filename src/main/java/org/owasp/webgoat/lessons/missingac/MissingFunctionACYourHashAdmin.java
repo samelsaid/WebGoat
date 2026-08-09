@@ -42,8 +42,7 @@ public class MissingFunctionACYourHashAdmin implements AssignmentEndpoint {
   public AttackResult admin(String userHash, @CurrentUsername String username) {
     // the caller has to exist and hold the admin role, otherwise this endpoint leaks data that
     // only an administrator is allowed to see
-    var currentUser = userRepository.findByUsername(username);
-    if (currentUser == null || !currentUser.isAdmin()) {
+    if (!LessonAdmins.isAdmin(userRepository, username)) {
       return failed(this).feedback("access-control.hash.close").build();
     }
 

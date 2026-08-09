@@ -70,10 +70,15 @@ public class CommentsCache {
     var jc = JAXBContext.newInstance(Comment.class);
     var xif = XMLInputFactory.newInstance();
 
-    // TODO fix me disabled for now.
     if (securityEnabled) {
-      xif.setProperty(XMLConstants.ACCESS_EXTERNAL_DTD, ""); // Compliant
-      xif.setProperty(XMLConstants.ACCESS_EXTERNAL_SCHEMA, ""); // compliant
+      // A comment is data, it never needs a document type declaration or an entity that points
+      // somewhere else, so the reader is not allowed to follow either. Refusing the declaration
+      // outright is what closes the door, the two access properties only narrow what a resolver
+      // would have been permitted to reach.
+      xif.setProperty(XMLInputFactory.SUPPORT_DTD, Boolean.FALSE);
+      xif.setProperty(XMLInputFactory.IS_SUPPORTING_EXTERNAL_ENTITIES, Boolean.FALSE);
+      xif.setProperty(XMLConstants.ACCESS_EXTERNAL_DTD, "");
+      xif.setProperty(XMLConstants.ACCESS_EXTERNAL_SCHEMA, "");
     }
 
     var xsr = xif.createXMLStreamReader(new StringReader(xml));

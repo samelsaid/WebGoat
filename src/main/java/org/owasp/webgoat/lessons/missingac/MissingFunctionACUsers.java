@@ -101,10 +101,6 @@ public class MissingFunctionACUsers {
   }
 
   private boolean hasAdminRole(String username) {
-    if (username == null) {
-      return false;
-    }
-    var currentUser = userRepository.findByUsername(username);
-    return currentUser != null && currentUser.isAdmin();
+    return LessonAdmins.isAdmin(userRepository, username);
   }
 }

@@ -48,7 +48,17 @@ public class ProfileUploadBase implements AssignmentEndpoint {
     File uploadDirectory = cleanupAndCreateDirectoryForUser(username);
 
     try {
-      var uploadedFile = new File(uploadDirectory, fullName);
+      // Whatever the caller supplied as a name is reduced to a bare file name (no directory
+      // parts, no drive letter, no traversal segments) and the resolved location is then
+      // required to sit directly inside the caller's own upload directory.
+      String safeName = toSafeFileName(fullName);
+      if (safeName.isEmpty()) {
+        return failed(this).feedback("path-traversal-profile-empty-name").build();
+      }
+      var uploadedFile = new File(uploadDirectory, safeName);
+      if (!isInside(uploadDirectory, uploadedFile)) {
+        return failed(this).feedback("path-traversal-profile-empty-name").build();
+      }
       uploadedFile.createNewFile();
       FileCopyUtils.copy(file.getBytes(), uploadedFile);
 
@@ -63,6 +73,25 @@ public class ProfileUploadBase implements AssignmentEndpoint {
     } catch (IOException e) {
       return failed(this).output(e.getMessage()).build();
     }
+  }
+
+  private static String toSafeFileName(String requestedName) {
+    String candidate = requestedName.replace('\\', '/');
+    candidate = FilenameUtils.getName(candidate);
+    if (candidate == null) {
+      return "";
+    }
+    candidate = candidate.trim();
+    if (candidate.equals(".") || candidate.equals("..")) {
+      return "";
+    }
+    return candidate;
+  }
+
+  private static boolean isInside(File directory, File candidate) throws IOException {
+    var directoryPath = directory.getCanonicalFile().toPath();
+    var candidatePath = candidate.getCanonicalFile().toPath();
+    return candidatePath.getParent() != null && candidatePath.getParent().equals(directoryPath);
   }
 
   @SneakyThrows

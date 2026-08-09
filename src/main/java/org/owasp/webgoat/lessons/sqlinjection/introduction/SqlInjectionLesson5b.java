@@ -42,7 +42,9 @@ public class SqlInjectionLesson5b implements AssignmentEndpoint {
   }
 
   protected AttackResult injectableQuery(String login_count, String accountName) {
-    String queryString = "SELECT * From user_data WHERE Login_Count = ? and userid= " + accountName;
+    // The user id used to be glued into the statement text; it is bound now, exactly like the
+    // login count, so neither value can add syntax of its own.
+    String queryString = "SELECT * From user_data WHERE Login_Count = ? and userid= ?";
     try (Connection connection = dataSource.getConnection()) {
       PreparedStatement query =
           connection.prepareStatement(
@@ -62,7 +64,18 @@ public class SqlInjectionLesson5b implements AssignmentEndpoint {
             .build();
       }
 
+      int userId;
+      try {
+        userId = Integer.parseInt(accountName.trim());
+      } catch (NumberFormatException e) {
+        return failed(this)
+            .output("Could not parse: " + accountName + " to a number")
+            .feedback("sql-injection.5b.no.results")
+            .build();
+      }
+
       query.setInt(1, count);
+      query.setInt(2, userId);
       // String query = "SELECT * FROM user_data WHERE Login_Count = " + login_count + " and userid
       // = " + accountName, ;
       try {

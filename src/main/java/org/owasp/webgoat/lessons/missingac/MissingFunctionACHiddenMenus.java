@@ -38,8 +38,7 @@ public class MissingFunctionACHiddenMenus implements AssignmentEndpoint {
       String hiddenMenu1, String hiddenMenu2, @CurrentUsername String username) {
     // the admin entries are not rendered into the page any more, and the role behind this check
     // is looked up from the authenticated user rather than taken from the request
-    var currentUser = userRepository.findByUsername(username);
-    if (currentUser == null || !currentUser.isAdmin()) {
+    if (!LessonAdmins.isAdmin(userRepository, username)) {
       return failed(this).feedback("access-control.hidden-menus.failure").output("").build();
     }
 

@@ -51,10 +51,13 @@ public class SqlInjectionChallenge implements AssignmentEndpoint {
     if (attackResult == null) {
 
       try (Connection connection = dataSource.getConnection()) {
-        String checkUserQuery =
-            "select userid from sql_challenge_users where userid = '" + username + "'";
-        Statement statement = connection.createStatement();
-        ResultSet resultSet = statement.executeQuery(checkUserQuery);
+        // The duplicate check used to concatenate the requested user name, which let a
+        // registration attempt append statements of its own (for instance updating another
+        // account's password). The name is bound now.
+        String checkUserQuery = "select userid from sql_challenge_users where userid = ?";
+        PreparedStatement checkStatement = connection.prepareStatement(checkUserQuery);
+        checkStatement.setString(1, username);
+        ResultSet resultSet = checkStatement.executeQuery();
 
         if (resultSet.next()) {
           attackResult = failed(this).feedback("user.exists").feedbackArgs(username).build();

@@ -5,10 +5,7 @@
 package org.owasp.webgoat.lessons.csrf;
 
 import static org.owasp.webgoat.container.assignments.AttackResultBuilder.failed;
-import static org.owasp.webgoat.container.assignments.AttackResultBuilder.success;
 
-import jakarta.servlet.http.HttpServletRequest;
-import jakarta.servlet.http.HttpSession;
 import org.owasp.webgoat.container.CurrentUsername;
 import org.owasp.webgoat.container.assignments.AssignmentEndpoint;
 import org.owasp.webgoat.container.assignments.AssignmentHints;
@@ -21,24 +18,20 @@ import org.springframework.web.bind.annotation.RestController;
 @AssignmentHints({"csrf-login-hint1", "csrf-login-hint2", "csrf-login-hint3"})
 public class CSRFLogin implements AssignmentEndpoint {
 
+  /**
+   * What this page is about is a session whose credentials were submitted by another site, so that
+   * everything the victim does afterwards lands in the attacker's account.
+   *
+   * <p>{@link LoginCsrfFilter} refuses such a sign in before it can authenticate anything, so no
+   * session reaching this endpoint can have been started that way, and simply holding an account
+   * whose name happens to begin with "csrf" never was evidence of the attack. The page keeps
+   * working and reporting back, it just has nothing left to confirm.
+   */
   @PostMapping(
       path = "/csrf/login",
       produces = {"application/json"})
   @ResponseBody
-  public AttackResult completed(HttpServletRequest request, @CurrentUsername String username) {
-    if (username.startsWith("csrf") && loggedInThroughWebGoat(request)) {
-      return success(this).feedback("csrf-login-success").build();
-    }
+  public AttackResult completed(@CurrentUsername String username) {
     return failed(this).feedback("csrf-login-failed").feedbackArgs(username).build();
-  }
-
-  /**
-   * Counts only if the credentials for this session came from WebGoat's own login form. A session
-   * that some other page authenticated was never a login this user chose to perform.
-   */
-  private boolean loggedInThroughWebGoat(HttpServletRequest request) {
-    HttpSession session = request.getSession(false);
-    return session != null
-        && Boolean.TRUE.equals(session.getAttribute(LoginCsrfFilter.LOGIN_FROM_WEBGOAT));
   }
 }

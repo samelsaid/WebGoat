@@ -39,8 +39,7 @@ public class MissingFunctionACYourHash implements AssignmentEndpoint {
   public AttackResult simple(String userHash, @CurrentUsername String username) {
     // another account's hash is administrative data; the role comes from the authenticated
     // user, never from anything in the request
-    var currentUser = userRepository.findByUsername(username);
-    if (currentUser == null || !currentUser.isAdmin()) {
+    if (!LessonAdmins.isAdmin(userRepository, username)) {
       return failed(this).build();
     }
     User user = userRepository.findByUsername("Jerry");

@@ -10,6 +10,7 @@ import static org.owasp.webgoat.container.assignments.AttackResultBuilder.succes
 import java.io.ByteArrayInputStream;
 import java.io.IOException;
 import java.io.InvalidClassException;
+import java.io.ObjectInputFilter;
 import java.io.ObjectInputStream;
 import java.util.Base64;
 import org.dummy.insecure.framework.VulnerableTaskHolder;
@@ -29,6 +30,18 @@ import org.springframework.web.bind.annotation.RestController;
 })
 public class InsecureDeserializationTask implements AssignmentEndpoint {
 
+  // Deciding what an object is only after it has been read is too late, the damage is done while
+  // the stream is being consumed. The stream is therefore limited up front to the handful of
+  // types this endpoint actually expects, and everything else is rejected before it is built.
+  private static final ObjectInputFilter ACCEPTED_TYPES =
+      ObjectInputFilter.Config.createFilter(
+          "org.dummy.insecure.framework.VulnerableTaskHolder;"
+              + "java.lang.String;"
+              + "java.time.LocalDateTime;"
+              + "java.time.Ser;"
+              + "maxdepth=5;maxrefs=64;maxarray=16;"
+              + "!*");
+
   @PostMapping("/InsecureDeserialization/task")
   @ResponseBody
   public AttackResult completed(@RequestParam String token) throws IOException {
@@ -41,6 +54,7 @@ public class InsecureDeserializationTask implements AssignmentEndpoint {
 
     try (ObjectInputStream ois =
         new ObjectInputStream(new ByteArrayInputStream(Base64.getDecoder().decode(b64token)))) {
+      ois.setObjectInputFilter(ACCEPTED_TYPES);
       before = System.currentTimeMillis();
       Object o = ois.readObject();
       if (!(o instanceof VulnerableTaskHolder)) {
