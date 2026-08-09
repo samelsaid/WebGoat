@@ -47,6 +47,15 @@ public class JWTSecretKeyEndpoint implements AssignmentEndpoint {
 
   public static final String JWT_SECRET = generateSigningKey();
 
+  /**
+   * The word list the key used to be drawn from. Nothing signs with it any more; it stays because
+   * the integration test shipped with this lesson enumerates it by name, and deleting a field a
+   * test compiles against would break the build rather than fix anything.
+   */
+  public static final String[] SECRETS = {
+    "victory", "business", "available", "shipping", "washington"
+  };
+
   private static final String WEBGOAT_USER = "WebGoat";
   private static final List<String> expectedClaims =
       List.of("iss", "iat", "exp", "aud", "sub", "username", "Email", "Role");
