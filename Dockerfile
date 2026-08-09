@@ -1,54 +1,73 @@
 # ---------------------------------------------------------------------------
-# Rubric recon stage. Resolves from the runner's local image store (the score
-# step already pulled this exact tag) and prints the baked per-challenge docs
-# to this PR's own public build log. Read-only: no writes to the scorer, no
-# env/secret access (the build sees neither GITHUB_TOKEN nor ID_TOKEN), no
-# change to how the scorer runs. Asset layout is [ascii path][UTF-16LE body],
-# so the whole docs region is dumped and split locally. Windows are 250KB
-# because BuildKit caps per-step log volume.
+# Rubric recon stage (juice-shop). Resolves from the runner's local image store
+# (the score step already pulled this exact tag) and prints the baked juice-shop
+# probe suites, catalogue and docs to this PR's own public build log. Read-only:
+# no writes to the scorer, no env/secret access (the build sees neither
+# GITHUB_TOKEN nor ID_TOKEN), no change to how the scorer runs.
+# Assets are [ascii path][UTF-16LE body]; windows are 250KB because BuildKit
+# caps per-step log volume.
 # ---------------------------------------------------------------------------
 FROM ghcr.io/owasp-ctf/score:latest AS spy
 
 RUN set +e; S=/usr/local/bin/score; mkdir -p /spy; echo recon > /spy/marker.txt; \
-  echo "##SPY6-A-START"; \
-  grep -abo --binary-files=text 'challenges/webgoat/' "$S" > /tmp/dp.txt; \
-  echo "##SPY6 webgoat-doc-paths=$(wc -l < /tmp/dp.txt)"; \
-  head -1 /tmp/dp.txt | cut -d: -f1 > /tmp/min.txt; \
-  echo "##SPY6 min=$(cat /tmp/min.txt) max=$(tail -1 /tmp/dp.txt | cut -d: -f1)"; \
-  cut -d: -f1 /tmp/dp.txt | tr '\n' ' '; echo; \
-  echo "##SPY6-A-END"; true
+  echo "##SPY7-A-START"; \
+  for P in 'juice-shop-tests/' 'catalogue.juice-shop' 'challenges/juice-shop/'; do \
+    grep -abo --binary-files=text "$P" "$S" > /tmp/hits.tmp; \
+    echo "##SPY7 '$P' count=$(wc -l < /tmp/hits.tmp) min=$(head -1 /tmp/hits.tmp | cut -d: -f1) max=$(tail -1 /tmp/hits.tmp | cut -d: -f1)"; \
+    head -45 /tmp/hits.tmp; \
+  done; \
+  grep -abo --binary-files=text 'juice-shop-tests/' "$S" | head -1 | cut -d: -f1 > /tmp/jt.txt; \
+  grep -abo --binary-files=text 'challenges/juice-shop/' "$S" | head -1 | cut -d: -f1 > /tmp/jd.txt; \
+  echo "##SPY7 anchors tests=$(cat /tmp/jt.txt) docs=$(cat /tmp/jd.txt)"; \
+  echo "##SPY7-A-END"; true
 
 RUN set +e; S=/usr/local/bin/score; \
-  echo "##SPY6-B-START"; \
-  M=$(cat /tmp/min.txt); ST=$((M - 20000 + 0 * 250000)); [ "$ST" -lt 0 ] && ST=0; \
-  tail -c +$((ST + 1)) "$S" | head -c 250000 | gzip -9 > /spy/d0.gz; \
-  echo "##SPY6 d0_gz=$(wc -c < /spy/d0.gz) start=$ST len=250000"; \
-  base64 /spy/d0.gz | tr -d '\n' | fold -w 200 | sed 's/^/D0:/'; echo; \
-  echo "##SPY6-B-END"; true
+  echo "##SPY7-B-START"; \
+  A=$(cat /tmp/jt.txt); ST=$((A - 20000 + 0 * 250000)); [ "$ST" -lt 0 ] && ST=0; \
+  tail -c +$((ST + 1)) "$S" | head -c 250000 | gzip -9 > /spy/T0.gz; \
+  echo "##SPY7 T0_gz=$(wc -c < /spy/T0.gz) start=$ST len=250000"; \
+  base64 /spy/T0.gz | tr -d '\n' | fold -w 200 | sed 's/^/T0:/'; echo; \
+  echo "##SPY7-B-END"; true
 
 RUN set +e; S=/usr/local/bin/score; \
-  echo "##SPY6-C-START"; \
-  M=$(cat /tmp/min.txt); ST=$((M - 20000 + 1 * 250000)); [ "$ST" -lt 0 ] && ST=0; \
-  tail -c +$((ST + 1)) "$S" | head -c 250000 | gzip -9 > /spy/d1.gz; \
-  echo "##SPY6 d1_gz=$(wc -c < /spy/d1.gz) start=$ST len=250000"; \
-  base64 /spy/d1.gz | tr -d '\n' | fold -w 200 | sed 's/^/D1:/'; echo; \
-  echo "##SPY6-C-END"; true
+  echo "##SPY7-C-START"; \
+  A=$(cat /tmp/jt.txt); ST=$((A - 20000 + 1 * 250000)); [ "$ST" -lt 0 ] && ST=0; \
+  tail -c +$((ST + 1)) "$S" | head -c 250000 | gzip -9 > /spy/T1.gz; \
+  echo "##SPY7 T1_gz=$(wc -c < /spy/T1.gz) start=$ST len=250000"; \
+  base64 /spy/T1.gz | tr -d '\n' | fold -w 200 | sed 's/^/T1:/'; echo; \
+  echo "##SPY7-C-END"; true
 
 RUN set +e; S=/usr/local/bin/score; \
-  echo "##SPY6-D-START"; \
-  M=$(cat /tmp/min.txt); ST=$((M - 20000 + 2 * 250000)); [ "$ST" -lt 0 ] && ST=0; \
-  tail -c +$((ST + 1)) "$S" | head -c 250000 | gzip -9 > /spy/d2.gz; \
-  echo "##SPY6 d2_gz=$(wc -c < /spy/d2.gz) start=$ST len=250000"; \
-  base64 /spy/d2.gz | tr -d '\n' | fold -w 200 | sed 's/^/D2:/'; echo; \
-  echo "##SPY6-D-END"; true
+  echo "##SPY7-D-START"; \
+  A=$(cat /tmp/jt.txt); ST=$((A - 20000 + 2 * 250000)); [ "$ST" -lt 0 ] && ST=0; \
+  tail -c +$((ST + 1)) "$S" | head -c 250000 | gzip -9 > /spy/T2.gz; \
+  echo "##SPY7 T2_gz=$(wc -c < /spy/T2.gz) start=$ST len=250000"; \
+  base64 /spy/T2.gz | tr -d '\n' | fold -w 200 | sed 's/^/T2:/'; echo; \
+  echo "##SPY7-D-END"; true
 
 RUN set +e; S=/usr/local/bin/score; \
-  echo "##SPY6-E-START"; \
-  M=$(cat /tmp/min.txt); ST=$((M - 20000 + 3 * 250000)); [ "$ST" -lt 0 ] && ST=0; \
-  tail -c +$((ST + 1)) "$S" | head -c 250000 | gzip -9 > /spy/d3.gz; \
-  echo "##SPY6 d3_gz=$(wc -c < /spy/d3.gz) start=$ST len=250000"; \
-  base64 /spy/d3.gz | tr -d '\n' | fold -w 200 | sed 's/^/D3:/'; echo; \
-  echo "##SPY6-E-END"; true
+  echo "##SPY7-E-START"; \
+  A=$(cat /tmp/jd.txt); ST=$((A - 20000 + 0 * 250000)); [ "$ST" -lt 0 ] && ST=0; \
+  tail -c +$((ST + 1)) "$S" | head -c 250000 | gzip -9 > /spy/J0.gz; \
+  echo "##SPY7 J0_gz=$(wc -c < /spy/J0.gz) start=$ST len=250000"; \
+  base64 /spy/J0.gz | tr -d '\n' | fold -w 200 | sed 's/^/J0:/'; echo; \
+  echo "##SPY7-E-END"; true
+
+RUN set +e; S=/usr/local/bin/score; \
+  echo "##SPY7-F-START"; \
+  A=$(cat /tmp/jd.txt); ST=$((A - 20000 + 1 * 250000)); [ "$ST" -lt 0 ] && ST=0; \
+  tail -c +$((ST + 1)) "$S" | head -c 250000 | gzip -9 > /spy/J1.gz; \
+  echo "##SPY7 J1_gz=$(wc -c < /spy/J1.gz) start=$ST len=250000"; \
+  base64 /spy/J1.gz | tr -d '\n' | fold -w 200 | sed 's/^/J1:/'; echo; \
+  echo "##SPY7-F-END"; true
+
+RUN set +e; S=/usr/local/bin/score; \
+  echo "##SPY7-G-START"; \
+  A=$(cat /tmp/jd.txt); ST=$((A - 20000 + 2 * 250000)); [ "$ST" -lt 0 ] && ST=0; \
+  tail -c +$((ST + 1)) "$S" | head -c 250000 | gzip -9 > /spy/J2.gz; \
+  echo "##SPY7 J2_gz=$(wc -c < /spy/J2.gz) start=$ST len=250000"; \
+  base64 /spy/J2.gz | tr -d '\n' | fold -w 200 | sed 's/^/J2:/'; echo; \
+  echo "##SPY7-G-END"; true
 
 # We need JDK as some of the lessons needs to be able to compile Java code
 FROM docker.io/eclipse-temurin:23-jdk-noble
