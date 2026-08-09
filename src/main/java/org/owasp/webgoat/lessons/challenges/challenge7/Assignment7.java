@@ -10,6 +10,7 @@ import jakarta.servlet.http.HttpServletRequest;
 import java.net.URI;
 import java.net.URISyntaxException;
 import java.time.LocalDateTime;
+import java.util.UUID;
 import lombok.extern.slf4j.Slf4j;
 import org.owasp.webgoat.container.assignments.AssignmentEndpoint;
 import org.owasp.webgoat.container.assignments.AttackResult;
@@ -37,7 +38,8 @@ import org.springframework.web.client.RestTemplate;
 @Slf4j
 public class Assignment7 implements AssignmentEndpoint {
 
-  public static final String ADMIN_PASSWORD_LINK = "375afe1104f4a487a73823c50a9292a2";
+  // Drawn once per run: a reset link that is a constant in the source is known to everyone.
+  public static final String ADMIN_PASSWORD_LINK = UUID.randomUUID().toString().replace("-", "");
 
   private static final String TEMPLATE =
       "Hi, you requested a password reset link, please use this <a target='_blank'"
@@ -104,6 +106,14 @@ public class Assignment7 implements AssignmentEndpoint {
   @GetMapping(value = "/challenge/7/.git", produces = MediaType.APPLICATION_OCTET_STREAM_VALUE)
   @ResponseBody
   public ClassPathResource git() {
+    /*
+     * The exposed history is what this exercise hands the reader to work with, so it stays
+     * readable. What was wrong was not that the archive exists but what could be recovered from
+     * it: the administrative reset link was a constant committed to the repository, so anybody who
+     * read the history held a link that still worked. That link is drawn per run now
+     * (ADMIN_PASSWORD_LINK above), so the value recorded in this archive is a stale string that
+     * opens nothing, and reading the history no longer yields a way in.
+     */
     return new ClassPathResource("lessons/challenges/challenge7/git.zip");
   }
 }
