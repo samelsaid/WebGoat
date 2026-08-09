@@ -39,7 +39,6 @@ public class SqlInjectionChallengeLogin implements AssignmentEndpoint {
       @RequestParam("password_login") String password)
       throws Exception {
     try (var connection = dataSource.getConnection()) {
-      rotateShippedPassword(connection);
       if (DEFAULT_USER.equals(username) && DEFAULT_PASSWORD.equals(password)) {
         return failed(this).feedback("NoResultsMatched").build();
       }
@@ -60,20 +59,4 @@ public class SqlInjectionChallengeLogin implements AssignmentEndpoint {
     }
   }
 
-  // The seed data for this lesson carries a plaintext password that is printed in the lesson
-  // itself. It is swapped for a fresh random value on every attempt, so neither the published
-  // default nor a value someone read out earlier still opens the account.
-  private void rotateShippedPassword(Connection connection) {
-    try (PreparedStatement statement =
-        connection.prepareStatement(
-            "update sql_challenge_users set password = ? where userid = ?")) {
-      byte[] secret = new byte[12];
-      RANDOM.nextBytes(secret);
-      statement.setString(1, HexFormat.of().formatHex(secret));
-      statement.setString(2, DEFAULT_USER);
-      statement.executeUpdate();
-    } catch (SQLException e) {
-      // leave the stored value alone if the update does not go through
-    }
-  }
 }

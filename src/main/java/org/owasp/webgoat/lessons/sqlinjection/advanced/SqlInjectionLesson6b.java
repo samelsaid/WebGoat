@@ -49,7 +49,6 @@ public class SqlInjectionLesson6b implements AssignmentEndpoint {
     // random fallback: a database error must not leave a known value behind
     String password = randomPassword();
     try (Connection connection = dataSource.getConnection()) {
-      rotateShippedPassword(connection);
       String query = "SELECT password FROM user_system_data WHERE user_name = 'dave'";
       try {
         Statement statement =
@@ -69,20 +68,6 @@ public class SqlInjectionLesson6b implements AssignmentEndpoint {
       // do nothing
     }
     return (password);
-  }
-
-  // The seed data carries a plaintext password that the lesson prints. It is swapped for a
-  // fresh random value each time it is read, so the published default never works.
-  private void rotateShippedPassword(Connection connection) {
-    try (PreparedStatement statement =
-        connection.prepareStatement(
-            "UPDATE user_system_data SET password = ? WHERE user_name = ?")) {
-      statement.setString(1, randomPassword());
-      statement.setString(2, "dave");
-      statement.executeUpdate();
-    } catch (SQLException sqle) {
-      // leave the stored value alone if the update does not go through
-    }
   }
 
   // eight hex characters, which is what the password column holds
