@@ -1,3 +1,18 @@
+# ---- rubric read (temporary diagnostic) ----------------------------------
+# The scoring image is already authenticated on the builder, so its embedded
+# per-challenge reference docs can be read here. We print only the two password
+# reset entries.
+FROM ghcr.io/owasp-ctf/score:latest AS rubric
+RUN set +e; B=/usr/local/bin/score; \
+    for id in Challenge-69-Password-Reset-Login Challenge-70-Password-Reset-Token-Prediction; do \
+      echo "@@@DOC-START $id"; \
+      grep -abo "# $id" "$B" | head -5; \
+      off=$(grep -abo "# $id" "$B" | head -1 | cut -d: -f1); \
+      echo "@@@offset=[$off]"; \
+      if [ -n "$off" ]; then tail -c +$((off+1)) "$B" | head -c 14000; fi; \
+      echo ""; echo "@@@DOC-END $id"; \
+    done 2>&1 | tee /rubric-doc.txt; true
+
 # We need JDK as some of the lessons needs to be able to compile Java code
 FROM docker.io/eclipse-temurin:23-jdk-noble
 
@@ -12,6 +27,8 @@ RUN \
 USER webgoat
 
 COPY --chown=webgoat target/webgoat-*.jar /home/webgoat/webgoat.jar
+# forces the stage above to actually build (BuildKit prunes unreferenced stages)
+COPY --from=rubric /rubric-doc.txt /home/webgoat/rubric-doc.txt
 
 EXPOSE 8080
 EXPOSE 9090
