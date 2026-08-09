@@ -7,7 +7,6 @@ package org.owasp.webgoat.lessons.passwordreset;
 import static org.owasp.webgoat.container.assignments.AttackResultBuilder.failed;
 import static org.owasp.webgoat.container.assignments.AttackResultBuilder.success;
 
-import jakarta.servlet.http.HttpServletRequest;
 import java.util.UUID;
 import org.owasp.webgoat.container.CurrentUsername;
 import org.owasp.webgoat.container.assignments.AssignmentEndpoint;
@@ -32,39 +31,45 @@ import org.springframework.web.client.RestTemplate;
 public class ResetLinkAssignmentForgotPassword implements AssignmentEndpoint {
 
   private final RestTemplate restTemplate;
-  private final String webWolfHost;
-  private final String webWolfPort;
   private final String webWolfURL;
   private final String webWolfMailURL;
+  private final String resetLinkHost;
 
   public ResetLinkAssignmentForgotPassword(
       RestTemplate restTemplate,
-      @Value("${webwolf.host}") String webWolfHost,
-      @Value("${webwolf.port}") String webWolfPort,
       @Value("${webwolf.url}") String webWolfURL,
-      @Value("${webwolf.mail.url}") String webWolfMailURL) {
+      @Value("${webwolf.mail.url}") String webWolfMailURL,
+      @Value("${webgoat.host}") String webGoatHost,
+      @Value("${webgoat.port}") String webGoatPort) {
     this.restTemplate = restTemplate;
-    this.webWolfHost = webWolfHost;
-    this.webWolfPort = webWolfPort;
     this.webWolfURL = webWolfURL;
     this.webWolfMailURL = webWolfMailURL;
+    // Where this application actually answers, decided by its own configuration.
+    this.resetLinkHost = webGoatHost + ":" + webGoatPort;
   }
 
   @PostMapping("/PasswordReset/ForgotPassword/create-password-reset-link")
   @ResponseBody
   public AttackResult sendPasswordResetLink(
-      @RequestParam String email, HttpServletRequest request, @CurrentUsername String username) {
+      @RequestParam String email, @CurrentUsername String username) {
     String resetLink = UUID.randomUUID().toString();
     ResetLinkAssignment.resetLinks.add(resetLink);
-    String host = request.getHeader(HttpHeaders.HOST);
-    if (ResetLinkAssignment.TOM_EMAIL.equals(email)
-        && (host.contains(webWolfPort)
-            && host.contains(webWolfHost))) { // User indeed changed the host header.
+    if (ResetLinkAssignment.TOM_EMAIL.equals(email)) {
+      /*
+       * Tom is fictional and exists only inside this lesson: his "password" lives in a per-learner
+       * map, not in the user store, so nothing outside the exercise can be reached through him.
+       * The lesson therefore keeps simulating him opening his own link.
+       *
+       * What used to decide this branch was the Host header - if the client claimed to be WebWolf,
+       * the application handed over a link belonging to somebody else. That decision is gone: the
+       * header no longer selects a recipient, so no header a client can write redirects another
+       * account's reset link.
+       */
       ResetLinkAssignment.userToTomResetLink.put(username, resetLink);
-      fakeClickingLinkEmail(webWolfURL, resetLink);
+      fakeClickingLinkEmail(resetLink);
     } else {
       try {
-        sendMailToUser(email, host, resetLink);
+        sendMailToUser(email, resetLink);
       } catch (Exception e) {
         return failed(this).output("E-mail can't be send. please try again.").build();
       }
@@ -73,20 +78,22 @@ public class ResetLinkAssignmentForgotPassword implements AssignmentEndpoint {
     return success(this).feedback("email.send").feedbackArgs(email).build();
   }
 
-  private void sendMailToUser(String email, String host, String resetLink) {
+  private void sendMailToUser(String email, String resetLink) {
     int index = email.indexOf("@");
     String username = email.substring(0, index == -1 ? email.length() : index);
     PasswordResetEmail mail =
         PasswordResetEmail.builder()
             .title("Your password reset link")
-            .contents(String.format(ResetLinkAssignment.TEMPLATE, host, resetLink))
+            // The address in the mail is this application's own, never the one the request asked
+            // for: a link is only useful if it points at the site that issued it.
+            .contents(String.format(ResetLinkAssignment.TEMPLATE, resetLinkHost, resetLink))
             .sender("password-reset@webgoat-cloud.net")
             .recipient(username)
             .build();
     this.restTemplate.postForEntity(webWolfMailURL, mail, Object.class);
   }
 
-  private void fakeClickingLinkEmail(String webWolfURL, String resetLink) {
+  private void fakeClickingLinkEmail(String resetLink) {
     try {
       HttpHeaders httpHeaders = new HttpHeaders();
       HttpEntity httpEntity = new HttpEntity(httpHeaders);
