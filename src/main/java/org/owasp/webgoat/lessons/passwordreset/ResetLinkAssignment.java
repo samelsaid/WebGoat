@@ -10,6 +10,8 @@ import static org.owasp.webgoat.container.assignments.AttackResultBuilder.succes
 import static org.springframework.util.StringUtils.hasText;
 
 import java.security.MessageDigest;
+import java.time.Duration;
+import java.time.Instant;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
@@ -49,6 +51,16 @@ public class ResetLinkAssignment implements AssignmentEndpoint {
   static final String TOM_EMAIL = "tom@webgoat-cloud.org";
   static List<String> resetLinks = new CopyOnWriteArrayList<>();
   static Map<String, String> resetLinkOwners = new ConcurrentHashMap<>();
+
+  /*
+   * When each link was issued. A reset token is a bearer credential, and this one had no
+   * lifetime at all: every link ever handed out stayed redeemable for as long as the process
+   * ran, so anything that ever saw one - a mailbox, a proxy log, a browser history - kept a
+   * working key to the account indefinitely. Fifteen minutes is long enough to read the mail
+   * and short enough that a leaked link is usually already dead.
+   */
+  static Map<String, Instant> resetLinkIssuedAt = new ConcurrentHashMap<>();
+  private static final Duration LINK_LIFETIME = Duration.ofMinutes(15);
 
   // The mail carries a working link again - taking it out closed the hole by deleting the
   // exercise, and a reset flow that cannot be started is not a fixed reset flow. What changed is
@@ -137,6 +149,7 @@ public class ResetLinkAssignment implements AssignmentEndpoint {
     // and the link is spent after one use
     resetLinks.remove(form.getResetLink());
     resetLinkOwners.remove(form.getResetLink());
+    resetLinkIssuedAt.remove(form.getResetLink());
     modelAndView.setViewName(VIEW_FORMATTER.formatted("success"));
     return modelAndView;
   }
@@ -147,6 +160,14 @@ public class ResetLinkAssignment implements AssignmentEndpoint {
     }
     String email = resetLinkOwners.get(resetLinkFromForm);
     if (email == null) {
+      return false;
+    }
+    Instant issued = resetLinkIssuedAt.get(resetLinkFromForm);
+    if (issued == null || issued.plus(LINK_LIFETIME).isBefore(Instant.now())) {
+      // expired links are spent, not merely refused
+      resetLinks.remove(resetLinkFromForm);
+      resetLinkOwners.remove(resetLinkFromForm);
+      resetLinkIssuedAt.remove(resetLinkFromForm);
       return false;
     }
     // The mail lands in the mailbox named by the local part of the address, so only the owner of

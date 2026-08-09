@@ -46,6 +46,7 @@ public class ResetLinkAssignmentForgotPassword implements AssignmentEndpoint {
     String resetLink = UUID.randomUUID().toString();
     ResetLinkAssignment.resetLinks.add(resetLink);
     ResetLinkAssignment.resetLinkOwners.put(resetLink, email);
+    ResetLinkAssignment.resetLinkIssuedAt.put(resetLink, java.time.Instant.now());
     try {
       // Only a notification goes out. The token stays here, so neither the Host header (which
       // the client writes) nor access to the mailbox yields a link that works.
