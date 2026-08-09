@@ -8,10 +8,13 @@ import static org.owasp.webgoat.container.assignments.AttackResultBuilder.failed
 import static org.owasp.webgoat.container.assignments.AttackResultBuilder.success;
 
 import java.io.IOException;
+import java.security.SecureRandom;
 import java.sql.Connection;
+import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Statement;
+import java.util.HexFormat;
 import org.owasp.webgoat.container.LessonDataSource;
 import org.owasp.webgoat.container.assignments.AssignmentEndpoint;
 import org.owasp.webgoat.container.assignments.AttackResult;
@@ -22,6 +25,9 @@ import org.springframework.web.bind.annotation.RestController;
 
 @RestController
 public class SqlInjectionLesson6b implements AssignmentEndpoint {
+  private static final String DEFAULT_PASSWORD = "passW0rD";
+  private static final SecureRandom RANDOM = new SecureRandom();
+
   private final LessonDataSource dataSource;
 
   public SqlInjectionLesson6b(LessonDataSource dataSource) {
@@ -31,7 +37,8 @@ public class SqlInjectionLesson6b implements AssignmentEndpoint {
   @PostMapping("/SqlInjectionAdvanced/attack6b")
   @ResponseBody
   public AttackResult completed(@RequestParam String userid_6b) throws IOException {
-    if (userid_6b.equals(getPassword())) {
+    String currentPassword = getPassword();
+    if (!DEFAULT_PASSWORD.equals(currentPassword) && userid_6b.equals(currentPassword)) {
       return success(this).build();
     } else {
       return failed(this).build();
@@ -39,7 +46,8 @@ public class SqlInjectionLesson6b implements AssignmentEndpoint {
   }
 
   protected String getPassword() {
-    String password = "dave";
+    // random fallback: a database error must not leave a known value behind
+    String password = randomPassword();
     try (Connection connection = dataSource.getConnection()) {
       String query = "SELECT password FROM user_system_data WHERE user_name = 'dave'";
       try {
@@ -60,5 +68,12 @@ public class SqlInjectionLesson6b implements AssignmentEndpoint {
       // do nothing
     }
     return (password);
+  }
+
+  // eight hex characters, which is what the password column holds
+  private static String randomPassword() {
+    byte[] secret = new byte[4];
+    RANDOM.nextBytes(secret);
+    return HexFormat.of().formatHex(secret);
   }
 }
