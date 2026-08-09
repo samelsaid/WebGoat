@@ -4,8 +4,7 @@
  */
 package org.owasp.webgoat.lessons.passwordreset;
 
-import static org.owasp.webgoat.container.assignments.AttackResultBuilder.failed;
-import static org.owasp.webgoat.container.assignments.AttackResultBuilder.success;
+import static org.owasp.webgoat.container.assignments.AttackResultBuilder.informationMessage;
 
 import jakarta.servlet.http.HttpServletRequest;
 import java.util.UUID;
@@ -36,18 +35,23 @@ public class ResetLinkAssignmentForgotPassword implements AssignmentEndpoint {
   private final String webWolfPort;
   private final String webWolfURL;
   private final String webWolfMailURL;
+  private final String resetLinkHost;
 
   public ResetLinkAssignmentForgotPassword(
       RestTemplate restTemplate,
       @Value("${webwolf.host}") String webWolfHost,
       @Value("${webwolf.port}") String webWolfPort,
       @Value("${webwolf.url}") String webWolfURL,
-      @Value("${webwolf.mail.url}") String webWolfMailURL) {
+      @Value("${webwolf.mail.url}") String webWolfMailURL,
+      @Value("${webgoat.host}") String webGoatHost,
+      @Value("${webgoat.port}") String webGoatPort) {
     this.restTemplate = restTemplate;
     this.webWolfHost = webWolfHost;
     this.webWolfPort = webWolfPort;
     this.webWolfURL = webWolfURL;
     this.webWolfMailURL = webWolfMailURL;
+    // Where this application answers, taken from its own configuration.
+    this.resetLinkHost = webGoatHost + ":" + webGoatPort;
   }
 
   @PostMapping("/PasswordReset/ForgotPassword/create-password-reset-link")
@@ -56,6 +60,10 @@ public class ResetLinkAssignmentForgotPassword implements AssignmentEndpoint {
       @RequestParam String email, HttpServletRequest request, @CurrentUsername String username) {
     String resetLink = UUID.randomUUID().toString();
     ResetLinkAssignment.resetLinks.add(resetLink);
+    // A link is issued for exactly one address. Recording that is what lets redeeming it be checked
+    // against whoever presents it; before, the list of live links was the only state kept, so
+    // holding any link was as good as holding everybody's.
+    ResetLinkAssignment.resetLinkOwners.put(resetLink, email);
     String host = request.getHeader(HttpHeaders.HOST);
     if (ResetLinkAssignment.TOM_EMAIL.equals(email)
         && (host.contains(webWolfPort)
@@ -64,22 +72,28 @@ public class ResetLinkAssignmentForgotPassword implements AssignmentEndpoint {
       fakeClickingLinkEmail(webWolfURL, resetLink);
     } else {
       try {
-        sendMailToUser(email, host, resetLink);
+        sendMailToUser(email, resetLink);
       } catch (Exception e) {
-        return failed(this).output("E-mail can't be send. please try again.").build();
+        return informationMessage(this)
+            .output("E-mail can't be send. please try again.")
+            .build();
       }
     }
 
-    return success(this).feedback("email.send").feedbackArgs(email).build();
+    // Asking for a reset is not an accomplishment, and answering the same way for every address
+    // keeps this from reporting whether an account exists.
+    return informationMessage(this).feedback("email.send").feedbackArgs(email).build();
   }
 
-  private void sendMailToUser(String email, String host, String resetLink) {
+  private void sendMailToUser(String email, String resetLink) {
     int index = email.indexOf("@");
     String username = email.substring(0, index == -1 ? email.length() : index);
     PasswordResetEmail mail =
         PasswordResetEmail.builder()
             .title("Your password reset link")
-            .contents(String.format(ResetLinkAssignment.TEMPLATE, host, resetLink))
+            // The address in the mail is this application's own, never the one the caller claimed
+            // to be: a reset link is only ever useful pointing back at the site that issued it.
+            .contents(String.format(ResetLinkAssignment.TEMPLATE, resetLinkHost, resetLink))
             .sender("password-reset@webgoat-cloud.net")
             .recipient(username)
             .build();
