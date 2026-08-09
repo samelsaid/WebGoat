@@ -38,7 +38,20 @@ public class SqlInjectionLesson3 implements AssignmentEndpoint {
     return injectableQuery(query);
   }
 
+  // Lesson only ever needs a single UPDATE against employees; reject stacked
+  // statements/comments used to smuggle unrelated SQL past this box.
+  private boolean isAllowedStatement(String query) {
+    String stripped = query.strip();
+    long semicolons = stripped.chars().filter(c -> c == ';').count();
+    boolean noTrailingExtra = semicolons == 0 || (semicolons == 1 && stripped.endsWith(";"));
+    boolean noComments = !stripped.contains("--") && !stripped.contains("/*");
+    return noTrailingExtra && noComments && stripped.matches("(?is)UPDATE\\s+employees\\b.*");
+  }
+
   protected AttackResult injectableQuery(String query) {
+    if (!isAllowedStatement(query)) {
+      return failed(this).output("Invalid statement").build();
+    }
     try (Connection connection = dataSource.getConnection()) {
       try (Statement statement =
           connection.createStatement(TYPE_SCROLL_INSENSITIVE, CONCUR_READ_ONLY)) {

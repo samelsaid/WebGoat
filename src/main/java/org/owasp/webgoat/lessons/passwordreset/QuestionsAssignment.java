@@ -47,14 +47,10 @@ public class QuestionsAssignment implements AssignmentEndpoint {
     }
 
     String validAnswer = COLORS.get(username.toLowerCase());
-    if (validAnswer == null) {
-      return failed(this)
-          .feedback("password-questions-unknown-user")
-          .feedbackArgs(username)
-          .build();
-    } else if (validAnswer.equals(securityQuestion)) {
+    // Don't reveal whether the username exists: unknown user and wrong answer look identical.
+    if (validAnswer != null && validAnswer.equals(securityQuestion)) {
       return success(this).build();
     }
-    return failed(this).build();
+    return failed(this).feedback("password-questions-unknown-user").feedbackArgs(username).build();
   }
 }

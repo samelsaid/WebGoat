@@ -8,9 +8,10 @@ import static org.owasp.webgoat.container.assignments.AttackResultBuilder.failed
 import static org.owasp.webgoat.container.assignments.AttackResultBuilder.success;
 
 import jakarta.servlet.http.HttpServletRequest;
+import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
-import java.util.Random;
+import java.security.SecureRandom;
 import javax.xml.bind.DatatypeConverter;
 import org.owasp.webgoat.container.assignments.AssignmentEndpoint;
 import org.owasp.webgoat.container.assignments.AssignmentHints;
@@ -26,6 +27,7 @@ import org.springframework.web.bind.annotation.RestController;
 @AssignmentHints({"crypto-hashing.hints.1", "crypto-hashing.hints.2"})
 public class HashingAssignment implements AssignmentEndpoint {
   public static final String[] SECRETS = {"secret", "admin", "password", "123456", "passw0rd"};
+  private static final SecureRandom RANDOM = new SecureRandom();
 
   @RequestMapping(path = "/crypto/hashing/md5", produces = MediaType.TEXT_HTML_VALUE)
   @ResponseBody
@@ -34,7 +36,7 @@ public class HashingAssignment implements AssignmentEndpoint {
     String md5Hash = (String) request.getSession().getAttribute("md5Hash");
     if (md5Hash == null) {
 
-      String secret = SECRETS[new Random().nextInt(SECRETS.length)];
+      String secret = SECRETS[RANDOM.nextInt(SECRETS.length)];
 
       MessageDigest md = MessageDigest.getInstance("MD5");
       md.update(secret.getBytes());
@@ -52,7 +54,7 @@ public class HashingAssignment implements AssignmentEndpoint {
 
     String sha256 = (String) request.getSession().getAttribute("sha256");
     if (sha256 == null) {
-      String secret = SECRETS[new Random().nextInt(SECRETS.length)];
+      String secret = SECRETS[RANDOM.nextInt(SECRETS.length)];
       sha256 = getHash(secret, "SHA-256");
       request.getSession().setAttribute("sha256Hash", sha256);
       request.getSession().setAttribute("sha256Secret", secret);
@@ -71,13 +73,24 @@ public class HashingAssignment implements AssignmentEndpoint {
     String sha256Secret = (String) request.getSession().getAttribute("sha256Secret");
 
     if (answer_pwd1 != null && answer_pwd2 != null) {
-      if (answer_pwd1.equals(md5Secret) && answer_pwd2.equals(sha256Secret)) {
+      boolean pwd1Ok = secretEquals(answer_pwd1, md5Secret);
+      boolean pwd2Ok = secretEquals(answer_pwd2, sha256Secret);
+      if (pwd1Ok && pwd2Ok) {
         return success(this).feedback("crypto-hashing.success").build();
-      } else if (answer_pwd1.equals(md5Secret) || answer_pwd2.equals(sha256Secret)) {
+      } else if (pwd1Ok || pwd2Ok) {
         return failed(this).feedback("crypto-hashing.oneok").build();
       }
     }
     return failed(this).feedback("crypto-hashing.empty").build();
+  }
+
+  // constant-time comparison to avoid leaking the secret via response timing
+  private static boolean secretEquals(String answer, String secret) {
+    if (secret == null) {
+      return false;
+    }
+    return MessageDigest.isEqual(
+        answer.getBytes(StandardCharsets.UTF_8), secret.getBytes(StandardCharsets.UTF_8));
   }
 
   public static String getHash(String secret, String algorithm) throws NoSuchAlgorithmException {

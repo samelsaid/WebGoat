@@ -90,21 +90,19 @@ public class ProfileUploadRetrieval implements AssignmentEndpoint {
   @GetMapping("/PathTraversal/random-picture")
   @ResponseBody
   public ResponseEntity<?> getProfilePicture(HttpServletRequest request) {
-    var queryParams = request.getQueryString();
-    if (queryParams != null && (queryParams.contains("..") || queryParams.contains("/"))) {
-      return ResponseEntity.badRequest()
-          .body("Illegal characters are not allowed in the query params");
-    }
     try {
       var id = request.getParameter("id");
       var catPicture =
           new File(catPicturesDirectory, (id == null ? RandomUtils.nextInt(1, 11) : id) + ".jpg");
-
-      if (catPicture.getName().toLowerCase().contains("path-traversal-secret.jpg")) {
-        return ResponseEntity.ok()
-            .contentType(MediaType.parseMediaType(MediaType.IMAGE_JPEG_VALUE))
-            .body(FileCopyUtils.copyToByteArray(catPicture));
+      // Checking the raw query string for ".."/"/" misses URL-encoded traversal, so validate
+      // the resolved, decoded path instead: it must stay inside the cat pictures directory.
+      var canonicalCatDir = catPicturesDirectory.getCanonicalFile();
+      catPicture = catPicture.getCanonicalFile();
+      if (!catPicture.getPath().startsWith(canonicalCatDir.getPath() + File.separator)) {
+        return ResponseEntity.badRequest()
+            .body("Illegal characters are not allowed in the query params");
       }
+
       if (catPicture.exists()) {
         return ResponseEntity.ok()
             .contentType(MediaType.parseMediaType(MediaType.IMAGE_JPEG_VALUE))

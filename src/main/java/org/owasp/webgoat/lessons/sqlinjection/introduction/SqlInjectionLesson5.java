@@ -57,7 +57,20 @@ public class SqlInjectionLesson5 implements AssignmentEndpoint {
     return injectableQuery(query);
   }
 
+  // Lesson only ever needs a single GRANT statement; reject stacked statements/comments
+  // used to smuggle unrelated SQL past this box.
+  private boolean isAllowedStatement(String query) {
+    String stripped = query.strip();
+    long semicolons = stripped.chars().filter(c -> c == ';').count();
+    boolean noTrailingExtra = semicolons == 0 || (semicolons == 1 && stripped.endsWith(";"));
+    boolean noComments = !stripped.contains("--") && !stripped.contains("/*");
+    return noTrailingExtra && noComments && stripped.matches("(?is)GRANT\\b.*");
+  }
+
   protected AttackResult injectableQuery(String query) {
+    if (!isAllowedStatement(query)) {
+      return failed(this).output("Invalid statement").build();
+    }
     try (Connection connection = dataSource.getConnection()) {
       try (Statement statement =
           connection.createStatement(

@@ -8,8 +8,10 @@ import static org.owasp.webgoat.container.assignments.AttackResultBuilder.failed
 import static org.owasp.webgoat.container.assignments.AttackResultBuilder.success;
 
 import jakarta.servlet.http.HttpServletRequest;
+import java.nio.charset.StandardCharsets;
+import java.security.MessageDigest;
+import java.security.SecureRandom;
 import java.util.Base64;
-import java.util.Random;
 import org.owasp.webgoat.container.assignments.AssignmentEndpoint;
 import org.owasp.webgoat.container.assignments.AttackResult;
 import org.springframework.http.MediaType;
@@ -22,6 +24,8 @@ import org.springframework.web.bind.annotation.RestController;
 @RestController
 public class EncodingAssignment implements AssignmentEndpoint {
 
+  private static final SecureRandom RANDOM = new SecureRandom();
+
   public static String getBasicAuth(String username, String password) {
     return Base64.getEncoder().encodeToString(username.concat(":").concat(password).getBytes());
   }
@@ -33,8 +37,7 @@ public class EncodingAssignment implements AssignmentEndpoint {
     String basicAuth = (String) request.getSession().getAttribute("basicAuth");
     String username = request.getUserPrincipal().getName();
     if (basicAuth == null) {
-      String password =
-          HashingAssignment.SECRETS[new Random().nextInt(HashingAssignment.SECRETS.length)];
+      String password = HashingAssignment.SECRETS[RANDOM.nextInt(HashingAssignment.SECRETS.length)];
       basicAuth = getBasicAuth(username, password);
       request.getSession().setAttribute("basicAuth", basicAuth);
     }
@@ -51,7 +54,9 @@ public class EncodingAssignment implements AssignmentEndpoint {
     if (basicAuth != null
         && answer_user != null
         && answer_pwd != null
-        && basicAuth.equals(getBasicAuth(answer_user, answer_pwd))) {
+        && MessageDigest.isEqual(
+            basicAuth.getBytes(StandardCharsets.UTF_8),
+            getBasicAuth(answer_user, answer_pwd).getBytes(StandardCharsets.UTF_8))) {
       return success(this).feedback("crypto-encoding.success").build();
     } else {
       return failed(this).feedback("crypto-encoding.empty").build();

@@ -9,6 +9,7 @@ import static org.owasp.webgoat.container.assignments.AttackResultBuilder.succes
 import jakarta.servlet.http.HttpServletRequest;
 import java.net.URI;
 import java.net.URISyntaxException;
+import java.security.SecureRandom;
 import java.time.LocalDateTime;
 import lombok.extern.slf4j.Slf4j;
 import org.owasp.webgoat.container.assignments.AssignmentEndpoint;
@@ -37,7 +38,19 @@ import org.springframework.web.client.RestTemplate;
 @Slf4j
 public class Assignment7 implements AssignmentEndpoint {
 
-  public static final String ADMIN_PASSWORD_LINK = "375afe1104f4a487a73823c50a9292a2";
+  // generated per boot with a CSPRNG instead of a fixed literal so a leaked/old copy of
+  // this source (e.g. from version control history) can no longer be replayed
+  public static final String ADMIN_PASSWORD_LINK = generateAdminPasswordLink();
+
+  private static String generateAdminPasswordLink() {
+    byte[] bytes = new byte[16];
+    new SecureRandom().nextBytes(bytes);
+    StringBuilder sb = new StringBuilder();
+    for (byte b : bytes) {
+      sb.append(String.format("%02x", b));
+    }
+    return sb.toString();
+  }
 
   private static final String TEMPLATE =
       "Hi, you requested a password reset link, please use this <a target='_blank'"

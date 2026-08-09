@@ -44,13 +44,10 @@ public class InsecureDeserializationTask implements AssignmentEndpoint {
           @Override
           protected Class<?> resolveClass(java.io.ObjectStreamClass desc)
               throws java.io.IOException, ClassNotFoundException {
-            // Type is decided before the object is constructed: a gadget class is refused
-            // here rather than after its side effects have already run.
-            if (!VulnerableTaskHolder.class.getName().equals(desc.getName())) {
-              throw new java.io.InvalidClassException(
-                  "Refused to deserialize unexpected class", desc.getName());
-            }
-            return super.resolveClass(desc);
+            // Client-supplied bytes are data, not code: no class descriptor on this
+            // stream is trusted, since VulnerableTaskHolder's own readObject is the gadget.
+            throw new java.io.InvalidClassException(
+                "Refused to deserialize unexpected class", desc.getName());
           }
         }) {
       before = System.currentTimeMillis();

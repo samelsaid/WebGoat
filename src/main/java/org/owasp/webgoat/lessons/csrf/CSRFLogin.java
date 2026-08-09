@@ -7,6 +7,7 @@ package org.owasp.webgoat.lessons.csrf;
 import static org.owasp.webgoat.container.assignments.AttackResultBuilder.failed;
 import static org.owasp.webgoat.container.assignments.AttackResultBuilder.success;
 
+import jakarta.servlet.http.HttpServletRequest;
 import org.owasp.webgoat.container.CurrentUsername;
 import org.owasp.webgoat.container.assignments.AssignmentEndpoint;
 import org.owasp.webgoat.container.assignments.AssignmentHints;
@@ -23,7 +24,11 @@ public class CSRFLogin implements AssignmentEndpoint {
       path = "/csrf/login",
       produces = {"application/json"})
   @ResponseBody
-  public AttackResult completed(@CurrentUsername String username) {
+  public AttackResult completed(@CurrentUsername String username, HttpServletRequest request) {
+    // a forged cross-site login-CSRF carries no Origin/Referer for this host
+    if (!CSRFOrigin.isSameOrigin(request)) {
+      return failed(this).feedback("csrf-login-failed").feedbackArgs(username).build();
+    }
     if (username.startsWith("csrf")) {
       return success(this).feedback("csrf-login-success").build();
     }

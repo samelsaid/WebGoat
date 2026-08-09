@@ -31,10 +31,17 @@ public class MissingFunctionACUsers {
   private final MissingAccessControlUserRepository userRepository;
 
   @GetMapping(path = {"access-control/users"})
-  public ModelAndView listUsers() {
-
+  public ModelAndView listUsers(@CurrentUsername String username) {
+    // listing user records (with hashes) is admin-only functionality
+    var currentUser = userRepository.findByUsername(username);
     ModelAndView model = new ModelAndView();
     model.setViewName("list_users");
+    if (currentUser == null || !currentUser.isAdmin()) {
+      model.setStatus(HttpStatus.FORBIDDEN);
+      model.addObject("numUsers", 0);
+      model.addObject("allUsers", List.of());
+      return model;
+    }
     List<User> allUsers = userRepository.findAllUsers();
     model.addObject("numUsers", allUsers.size());
     // add display user objects in place of direct users
@@ -51,7 +58,12 @@ public class MissingFunctionACUsers {
       path = {"access-control/users"},
       consumes = "application/json")
   @ResponseBody
-  public ResponseEntity<List<DisplayUser>> usersService() {
+  public ResponseEntity<List<DisplayUser>> usersService(@CurrentUsername String username) {
+    // listing user records (with hashes) is admin-only functionality
+    var currentUser = userRepository.findByUsername(username);
+    if (currentUser == null || !currentUser.isAdmin()) {
+      return ResponseEntity.status(HttpStatus.FORBIDDEN).build();
+    }
     return ResponseEntity.ok(
         userRepository.findAllUsers().stream()
             .map(user -> new DisplayUser(user, PASSWORD_SALT_SIMPLE))
@@ -78,7 +90,14 @@ public class MissingFunctionACUsers {
       consumes = "application/json",
       produces = "application/json")
   @ResponseBody
-  public User addUser(@RequestBody User newUser) {
+  public User addUser(@RequestBody User newUser, @CurrentUsername String username) {
+    // only an existing admin may grant admin on a new account; otherwise self-registration
+    // could be used to escalate privilege and bypass the admin checks above
+    var currentUser = userRepository.findByUsername(username);
+    boolean callerIsAdmin = currentUser != null && currentUser.isAdmin();
+    if (newUser.isAdmin() && !callerIsAdmin) {
+      newUser.setAdmin(false);
+    }
     try {
       userRepository.save(newUser);
       return newUser;
