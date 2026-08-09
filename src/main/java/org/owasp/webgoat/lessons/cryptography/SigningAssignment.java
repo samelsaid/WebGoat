@@ -35,22 +35,21 @@ import org.springframework.web.bind.annotation.RestController;
 public class SigningAssignment implements AssignmentEndpoint {
 
   /*
-   * One key pair per session, and only its public half is ever written to a response. Give out
-   * the private half and anybody can sign on behalf of this application.
+   * This key pair belongs only to the current user's disposable signing exercise. Returning its
+   * private half is the input the lesson asks the user to sign with; it has no application-wide
+   * authority and is never shared with another session.
    */
   @RequestMapping(path = "/crypto/signing/getprivate", produces = MediaType.TEXT_HTML_VALUE)
   @ResponseBody
-  public String getPublicKey(HttpServletRequest request)
+  public String getExercisePrivateKey(HttpServletRequest request)
       throws NoSuchAlgorithmException, InvalidAlgorithmParameterException {
 
-    String publicKey = (String) request.getSession().getAttribute("publicKeyString");
-    if (publicKey == null) {
-      KeyPair keyPair = CryptoUtil.generateKeyPair();
-      publicKey = CryptoUtil.getPublicKeyInPEM(keyPair);
-      request.getSession().setAttribute("publicKeyString", publicKey);
+    KeyPair keyPair = (KeyPair) request.getSession().getAttribute("keyPair");
+    if (keyPair == null) {
+      keyPair = CryptoUtil.generateKeyPair();
       request.getSession().setAttribute("keyPair", keyPair);
     }
-    return publicKey;
+    return CryptoUtil.getPrivateKeyInPEM(keyPair);
   }
 
   @PostMapping("/crypto/signing/verify")
