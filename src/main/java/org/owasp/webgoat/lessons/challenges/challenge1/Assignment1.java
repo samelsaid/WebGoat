@@ -5,8 +5,8 @@
 package org.owasp.webgoat.lessons.challenges.challenge1;
 
 import static org.owasp.webgoat.container.assignments.AttackResultBuilder.failed;
+import static org.owasp.webgoat.container.assignments.AttackResultBuilder.success;
 import static org.owasp.webgoat.lessons.challenges.SolutionConstants.PASSWORD;
-import static org.owasp.webgoat.lessons.challenges.SolutionConstants.PINCODE_PLACEHOLDER;
 
 import org.owasp.webgoat.container.assignments.AssignmentEndpoint;
 import org.owasp.webgoat.container.assignments.AttackResult;
@@ -32,14 +32,10 @@ public class Assignment1 implements AssignmentEndpoint {
     boolean passwordCorrect =
         "admin".equals(username)
             && PASSWORD
-                .replace(PINCODE_PLACEHOLDER, String.format("%04d", ImageServlet.PINCODE))
+                .replace("1234", String.format("%04d", ImageServlet.PINCODE))
                 .equals(password);
     if (passwordCorrect && ipAddressKnown) {
-      // The administrator's password was recoverable from an image this application hands to
-      // anyone who asks for it. The bytes carrying it are gone, but presenting that password is
-      // still not evidence of being the administrator - it only shows the holder read an asset
-      // they were served. The flag is not issued for it.
-      return failed(this).feedback("ip.address.unknown").build();
+      return success(this).feedback("challenge.solved").feedbackArgs(flags.getFlag(1)).build();
     } else if (passwordCorrect) {
       return failed(this).feedback("ip.address.unknown").build();
     }

@@ -34,8 +34,7 @@ class Assignment1Test extends LessonTest {
                 .param(
                     "password",
                     SolutionConstants.PASSWORD.replace(
-                        SolutionConstants.PINCODE_PLACEHOLDER,
-                        String.format("%04d", ImageServlet.PINCODE))))
+                        "1234", String.format("%04d", ImageServlet.PINCODE))))
         .andExpect(jsonPath("$.feedback", CoreMatchers.containsString("flag: " + flags.getFlag(1))))
         .andExpect(jsonPath("$.lessonCompleted", CoreMatchers.is(true)));
   }
