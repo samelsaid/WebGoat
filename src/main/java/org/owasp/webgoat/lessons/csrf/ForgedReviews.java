@@ -29,6 +29,7 @@ import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.ResponseBody;
 import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.util.HtmlUtils;
 
 @RestController
 @AssignmentHints({"csrf-review-hint1", "csrf-review-hint2", "csrf-review-hint3"})
@@ -105,10 +106,13 @@ public class ForgedReviews implements AssignmentEndpoint {
       return failed(this).feedback("csrf-you-forgot-something").build();
     }
 
+    // csrf-review.js builds each entry as an HTML string and hands it to jQuery, so a review is
+    // stored encoded. Markup typed into the form is shown as text instead of running in the
+    // browser of whoever loads the review list next.
     Review review = new Review();
-    review.setText(reviewText);
+    review.setText(escapeHtml(reviewText));
     review.setDateTime(LocalDateTime.now().format(fmt));
-    review.setUser(username);
+    review.setUser(escapeHtml(username));
     review.setStars(stars);
     var reviews = userReviews.getOrDefault(username, new ArrayList<>());
     reviews.add(review);
@@ -130,5 +134,9 @@ public class ForgedReviews implements AssignmentEndpoint {
     return MessageDigest.isEqual(
         provided.getBytes(StandardCharsets.UTF_8),
         expected.toString().getBytes(StandardCharsets.UTF_8));
+  }
+
+  private static String escapeHtml(String text) {
+    return text == null ? "" : HtmlUtils.htmlEscape(text);
   }
 }

@@ -6,6 +6,7 @@ package org.owasp.webgoat.lessons.challenges.challenge1;
 
 import static org.owasp.webgoat.container.assignments.AttackResultBuilder.failed;
 import static org.owasp.webgoat.lessons.challenges.SolutionConstants.PASSWORD;
+import static org.owasp.webgoat.lessons.challenges.SolutionConstants.PINCODE_PLACEHOLDER;
 
 import org.owasp.webgoat.container.assignments.AssignmentEndpoint;
 import org.owasp.webgoat.container.assignments.AttackResult;
@@ -31,7 +32,7 @@ public class Assignment1 implements AssignmentEndpoint {
     boolean passwordCorrect =
         "admin".equals(username)
             && PASSWORD
-                .replace("1234", String.format("%04d", ImageServlet.PINCODE))
+                .replace(PINCODE_PLACEHOLDER, String.format("%04d", ImageServlet.PINCODE))
                 .equals(password);
     if (passwordCorrect && ipAddressKnown) {
       // The administrator's password was recoverable from an image this application hands to
