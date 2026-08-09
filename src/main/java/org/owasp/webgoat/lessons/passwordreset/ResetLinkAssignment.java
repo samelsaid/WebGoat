@@ -5,7 +5,6 @@
 package org.owasp.webgoat.lessons.passwordreset;
 
 import static org.owasp.webgoat.container.assignments.AttackResultBuilder.failed;
-import static org.owasp.webgoat.container.assignments.AttackResultBuilder.success;
 import static org.springframework.util.StringUtils.hasText;
 
 import com.google.common.collect.Maps;
@@ -68,15 +67,15 @@ public class ResetLinkAssignment implements AssignmentEndpoint {
 
   @PostMapping("/PasswordReset/reset/login")
   @ResponseBody
-  public AttackResult login(
-      @RequestParam String password, @RequestParam String email, @CurrentUsername String username) {
+  public AttackResult login(@RequestParam String password, @RequestParam String email) {
+    /*
+     * A password recorded against a reset link is not evidence of anything about the account that
+     * link was addressed to. Whoever completed that form proved only that they held the link, and
+     * holding a link is exactly what a reset flow must not treat as identity. So no password
+     * arriving here signs anybody in as the owner of that address.
+     */
     if (TOM_EMAIL.equals(email)) {
-      String passwordTom = usersToTomPassword.getOrDefault(username, PASSWORD_TOM_9);
-      if (passwordTom.equals(PASSWORD_TOM_9)) {
-        return failed(this).feedback("login_failed").build();
-      } else if (passwordTom.equals(password)) {
-        return success(this).build();
-      }
+      return failed(this).feedback("login_failed").build();
     }
     return failed(this).feedback("login_failed.tom").build();
   }
