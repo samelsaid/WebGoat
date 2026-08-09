@@ -75,6 +75,12 @@ public class Requests {
     if (path.contains("/landing")) {
       return query != null && query.contains(username);
     }
+    if (path.contains("/PasswordReset/reset/reset-password/")) {
+      // This one is recorded from a request the application itself makes, carrying no session and
+      // no header belonging to anybody, so showing it hands over nothing that was not already
+      // this reader's to see - and the password reset exercise is read from exactly here.
+      return true;
+    }
     return false;
   }
 
