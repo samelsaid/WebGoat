@@ -32,6 +32,21 @@ public final class CsrfExemptions {
             && request.getHeader("Referer") == null;
   }
 
+  /**
+   * Matches a POST to one of the given paths regardless of which headers it carries.
+   *
+   * <p>For a call whose safety does not rest on the token: asking for a password reset only ever
+   * sends a message to the address named in the request, and the token that comes back is bound to
+   * that account, so a forged request achieves nothing an attacker could not achieve by typing the
+   * address themselves.
+   */
+  public static RequestMatcher post(String... paths) {
+    List<String> exempted = Arrays.asList(paths);
+    return request ->
+        "POST".equalsIgnoreCase(request.getMethod())
+            && exempted.contains(pathWithoutContext(request));
+  }
+
   private static String pathWithoutContext(HttpServletRequest request) {
     String uri = request.getRequestURI();
     String context = request.getContextPath();
