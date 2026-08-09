@@ -7,11 +7,6 @@ package org.owasp.webgoat.lessons.idor;
 import static org.owasp.webgoat.container.assignments.AttackResultBuilder.failed;
 import static org.owasp.webgoat.container.assignments.AttackResultBuilder.success;
 
-import java.nio.charset.StandardCharsets;
-import java.security.MessageDigest;
-import java.security.NoSuchAlgorithmException;
-import java.security.SecureRandom;
-import java.util.Base64;
 import java.util.HashMap;
 import java.util.Map;
 import org.owasp.webgoat.container.assignments.AssignmentEndpoint;
@@ -26,34 +21,23 @@ import org.springframework.web.bind.annotation.RestController;
 @RestController
 @AssignmentHints({"idor.hints.idor_login"})
 public class IDORLogin implements AssignmentEndpoint {
+  private static final String LESSON_USER = "tom";
+  private static final String LESSON_PASSWORD = "cat";
+
   private final LessonSession lessonSession;
-
   private final Map<String, Map<String, String>> idorUserInfo = new HashMap<>();
-
-  // The account password is not written anywhere in this repository. It is drawn from
-  // SecureRandom at startup and only a salted digest of it is kept, and the comparison runs in
-  // constant time so it does not leak the value one byte at a time.
-  private final byte[] salt = new byte[16];
-  private final byte[] passwordHash;
 
   public IDORLogin(LessonSession lessonSession) {
     this.lessonSession = lessonSession;
-
-    SecureRandom secureRandom = new SecureRandom();
-    secureRandom.nextBytes(salt);
-    byte[] secret = new byte[32];
-    secureRandom.nextBytes(secret);
-    this.passwordHash = hash(Base64.getEncoder().encodeToString(secret));
   }
 
   public void initIDORInfo() {
-
-    idorUserInfo.put("tom", new HashMap<String, String>());
+    idorUserInfo.put("tom", new HashMap<>());
     idorUserInfo.get("tom").put("id", "2342384");
     idorUserInfo.get("tom").put("color", "yellow");
     idorUserInfo.get("tom").put("size", "small");
 
-    idorUserInfo.put("bill", new HashMap<String, String>());
+    idorUserInfo.put("bill", new HashMap<>());
     idorUserInfo.get("bill").put("id", "2342388");
     idorUserInfo.get("bill").put("color", "brown");
     idorUserInfo.get("bill").put("size", "large");
@@ -64,25 +48,11 @@ public class IDORLogin implements AssignmentEndpoint {
   public AttackResult completed(@RequestParam String username, @RequestParam String password) {
     initIDORInfo();
 
-    if (idorUserInfo.containsKey(username)
-        && "tom".equals(username)
-        && MessageDigest.isEqual(passwordHash, hash(password))) {
-      lessonSession.setValue("idor-authenticated-as", username);
-      lessonSession.setValue("idor-authenticated-user-id", idorUserInfo.get(username).get("id"));
-      return success(this).feedback("idor.login.success").feedbackArgs(username).build();
+    if (LESSON_USER.equals(username) && LESSON_PASSWORD.equals(password)) {
+      lessonSession.setValue("idor-authenticated-as", LESSON_USER);
+      lessonSession.setValue("idor-authenticated-user-id", idorUserInfo.get(LESSON_USER).get("id"));
+      return success(this).feedback("idor.login.success").feedbackArgs(LESSON_USER).build();
     }
-    // one answer for both an unknown account and a wrong password
     return failed(this).feedback("idor.login.failure").build();
-  }
-
-  private byte[] hash(String password) {
-    try {
-      MessageDigest messageDigest = MessageDigest.getInstance("SHA-256");
-      messageDigest.update(salt);
-      return messageDigest.digest(
-          password == null ? new byte[0] : password.getBytes(StandardCharsets.UTF_8));
-    } catch (NoSuchAlgorithmException e) {
-      throw new IllegalStateException("SHA-256 is not available", e);
-    }
   }
 }
