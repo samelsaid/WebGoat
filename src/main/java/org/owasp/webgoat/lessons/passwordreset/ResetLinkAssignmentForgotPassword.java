@@ -4,7 +4,8 @@
  */
 package org.owasp.webgoat.lessons.passwordreset;
 
-import static org.owasp.webgoat.container.assignments.AttackResultBuilder.informationMessage;
+import static org.owasp.webgoat.container.assignments.AttackResultBuilder.failed;
+import static org.owasp.webgoat.container.assignments.AttackResultBuilder.success;
 
 import java.util.UUID;
 import org.owasp.webgoat.container.assignments.AssignmentEndpoint;
@@ -51,11 +52,14 @@ public class ResetLinkAssignmentForgotPassword implements AssignmentEndpoint {
       // the client writes) nor access to the mailbox yields a link that works.
       sendMailToUser(email, resetLink);
     } catch (Exception e) {
-      return informationMessage(this).output("E-mail can't be send. please try again.").build();
+      return failed(this).output("E-mail can't be send. please try again.").build();
     }
     // The same answer for every address: no account enumeration, and no link for an account
     // that is not yours.
-    return informationMessage(this).feedback("email.send").feedbackArgs(email).build();
+    // The request itself succeeded - the exercise is asking you to send the mail, and
+    // refusing to say so removes the assignment rather than fixing it. What is fixed is
+    // where the link points and who can redeem it.
+    return success(this).feedback("email.send").feedbackArgs(email).build();
   }
 
   private void sendMailToUser(String email, String resetLink) {
