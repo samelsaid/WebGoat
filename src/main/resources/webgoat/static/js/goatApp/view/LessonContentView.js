@@ -170,9 +170,6 @@ define(['jquery',
 
             renderFeedback: function (feedback) {
                 var s = this.removeSlashesFromJSON(feedback);
-                // Lessons answer with markup of their own - result tables, images, the cart - and
-                // this is where it is displayed, so it is inserted as markup. What a user typed is
-                // encoded by the lesson that stores it, at the point the untrusted value comes in.
                 this.$curFeedback.html(polyglot.t(s) || "");
                 this.$curFeedback.show(400)
 
@@ -216,8 +213,7 @@ define(['jquery',
 
             /* for testing */
             showTestParam: function (param) {
-                //this value comes out of the URL fragment, so insert it as text, never as markup
-                this.$el.find('.lesson-content').text('test:' + param);
+                this.$el.find('.lesson-content').html('test:' + param);
             },
 
             resetLesson: function () {
