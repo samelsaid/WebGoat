@@ -19,6 +19,7 @@ import java.util.ArrayList;
 import java.util.TimeZone;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.io.FileUtils;
+import org.apache.commons.io.FilenameUtils;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.MediaType;
 import org.springframework.security.core.Authentication;
@@ -69,18 +70,53 @@ public class FileServer {
     var username = authentication.getName();
     var destinationDir = new File(fileLocation, username);
     destinationDir.mkdirs();
+
+    /*
+     * The name comes from the upload, so it decides nothing about where the file lands. Resolving
+     * it as given let "../" walk out of the caller's own directory, and since the destination is
+     * deleted before it is written that reached both any file this process may write and any file
+     * it may remove. The name is reduced to its last segment and the resolved location has to sit
+     * directly inside the caller's directory before anything is touched.
+     */
+    var safeName = safeFileName(multipartFile.getOriginalFilename());
+    if (safeName == null) {
+      return rejectedUpload();
+    }
+    var destinationFile = destinationDir.toPath().resolve(safeName);
+    var resolvedParent = destinationFile.toFile().getCanonicalFile().getParentFile();
+    if (resolvedParent == null || !resolvedParent.equals(destinationDir.getCanonicalFile())) {
+      return rejectedUpload();
+    }
+
     // DO NOT use multipartFile.transferTo(), see
     // https://stackoverflow.com/questions/60336929/java-nio-file-nosuchfileexception-when-file-transferto-is-called
     try (InputStream is = multipartFile.getInputStream()) {
-      var destinationFile = destinationDir.toPath().resolve(multipartFile.getOriginalFilename());
       Files.deleteIfExists(destinationFile);
       Files.copy(is, destinationFile);
     }
-    log.debug("File saved to {}", new File(destinationDir, multipartFile.getOriginalFilename()));
+    log.debug("File saved to {}", destinationFile);
 
     return new ModelAndView(
         new RedirectView("files", true),
         new ModelMap().addAttribute("uploadSuccess", "File uploaded successful"));
+  }
+
+  /** The bare file name the upload asked for, or null when nothing usable is left of it. */
+  private static String safeFileName(String requestedName) {
+    if (requestedName == null) {
+      return null;
+    }
+    var candidate = FilenameUtils.getName(requestedName.replace('\\', '/'));
+    if (candidate == null || candidate.isBlank() || ".".equals(candidate)) {
+      return null;
+    }
+    return "..".equals(candidate) ? null : candidate;
+  }
+
+  private ModelAndView rejectedUpload() {
+    return new ModelAndView(
+        new RedirectView("files", true),
+        new ModelMap().addAttribute("uploadSuccess", "That file name is not accepted"));
   }
 
   @GetMapping(value = "/files")
