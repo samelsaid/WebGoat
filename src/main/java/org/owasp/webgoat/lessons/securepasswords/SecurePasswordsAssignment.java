@@ -24,7 +24,12 @@ public class SecurePasswordsAssignment implements AssignmentEndpoint {
 
   @PostMapping("SecurePasswords/assignment")
   @ResponseBody
+  private static final int MAX_PASSWORD_LENGTH = 128;
+
   public AttackResult completed(@RequestParam String password) {
+    if (password == null || password.length() > MAX_PASSWORD_LENGTH) {
+      return failed(this).feedback("securepassword-failed").output("Password too long").build();
+    }
     Zxcvbn zxcvbn = new Zxcvbn();
     StringBuilder output = new StringBuilder();
     DecimalFormat df = new DecimalFormat("0", DecimalFormatSymbols.getInstance(Locale.ENGLISH));
