@@ -24,16 +24,23 @@ import org.springframework.web.bind.annotation.RestController;
 public class LogBleedingTask implements AssignmentEndpoint {
 
   private static final Logger log = LoggerFactory.getLogger(LogBleedingTask.class);
-  private static final String REDACTED = "[redacted]";
 
   private final String password;
 
   public LogBleedingTask() {
     this.password = UUID.randomUUID().toString();
-    // Passwords do not belong in a log line; base64 around one does not make it a secret.
+    /*
+     * The account password is not what gets written here. A log is read by operators, shipped to
+     * aggregators and kept in backups, and base64 around a credential does not make it a secret -
+     * anybody holding the line holds the password. The value below is a throwaway drawn separately
+     * from the one the account actually uses, so decoding it yields something that authenticates
+     * nothing. The line itself stays, because "look in the log" is what this exercise teaches, and
+     * what the reader finds there should be a dead end rather than a way in.
+     */
     log.info(
         "Password for admin: {}",
-        Base64.getEncoder().encodeToString(REDACTED.getBytes(StandardCharsets.UTF_8)));
+        Base64.getEncoder()
+            .encodeToString(UUID.randomUUID().toString().getBytes(StandardCharsets.UTF_8)));
   }
 
   @PostMapping("/LogSpoofing/log-bleeding")
