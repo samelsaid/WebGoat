@@ -170,14 +170,17 @@ define(['jquery',
 
             renderFeedback: function (feedback) {
                 var s = this.removeSlashesFromJSON(feedback);
-                this.$curFeedback.text(polyglot.t(s) || "");
+                // Lessons answer with markup of their own - result tables, images, the cart - and
+                // this is where it is displayed, so it is inserted as markup. What a user typed is
+                // encoded by the lesson that stores it, at the point the untrusted value comes in.
+                this.$curFeedback.html(polyglot.t(s) || "");
                 this.$curFeedback.show(400)
 
             },
 
             renderOutput: function (output) {
                 var s = this.removeSlashesFromJSON(output);
-                this.$curOutput.text(polyglot.t(s) || "");
+                this.$curOutput.html(polyglot.t(s) || "");
                 this.$curOutput.show(400)
             },
 
