@@ -4,15 +4,16 @@
  */
 package org.owasp.webgoat.lessons.passwordreset;
 
+import static java.nio.charset.StandardCharsets.UTF_8;
 import static org.owasp.webgoat.container.assignments.AttackResultBuilder.failed;
 import static org.owasp.webgoat.container.assignments.AttackResultBuilder.success;
 import static org.springframework.util.StringUtils.hasText;
 
-import com.google.common.collect.Maps;
-import java.util.ArrayList;
-import java.util.HashMap;
+import java.security.MessageDigest;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.CopyOnWriteArrayList;
 import org.owasp.webgoat.container.CurrentUsername;
 import org.owasp.webgoat.container.assignments.AssignmentEndpoint;
 import org.owasp.webgoat.container.assignments.AssignmentHints;
@@ -45,13 +46,14 @@ import org.springframework.web.servlet.ModelAndView;
 public class ResetLinkAssignment implements AssignmentEndpoint {
 
   private static final String VIEW_FORMATTER = "lessons/passwordreset/templates/%s.html";
-  static final String PASSWORD_TOM_9 =
-      "somethingVeryRandomWhichNoOneWillEverTypeInAsPasswordForTom";
   static final String TOM_EMAIL = "tom@webgoat-cloud.org";
-  static Map<String, String> userToTomResetLink = new HashMap<>();
-  static Map<String, String> usersToTomPassword = Maps.newHashMap();
-  static List<String> resetLinks = new ArrayList<>();
+  static List<String> resetLinks = new CopyOnWriteArrayList<>();
+  static Map<String, String> resetLinkOwners = new ConcurrentHashMap<>();
 
+  // The mail carries a working link again - taking it out closed the hole by deleting the
+  // exercise, and a reset flow that cannot be started is not a fixed reset flow. What changed is
+  // where the address in it comes from (this server's configuration, never the Host header the
+  // caller wrote) and who may redeem it (the account it was issued to, once).
   static final String TEMPLATE =
       """
       Hi, you requested a password reset link, please use this <a target='_blank'
@@ -66,17 +68,22 @@ public class ResetLinkAssignment implements AssignmentEndpoint {
       Team WebGoat
       """;
 
+  // What a reset actually produced, so the account can be used afterwards. Keyed by the address
+  // the link was issued to, and only ever written after ownership of that address was checked.
+  static Map<String, String> accountPasswords = new ConcurrentHashMap<>();
+
   @PostMapping("/PasswordReset/reset/login")
   @ResponseBody
-  public AttackResult login(
-      @RequestParam String password, @RequestParam String email, @CurrentUsername String username) {
+  public AttackResult login(@RequestParam String password, @RequestParam String email) {
+    // A password set through a reset works, so the flow can actually be completed. It only ever
+    // got set by somebody who held a link issued to this address and proved they own the mailbox
+    // it was sent to, so reaching this from another account is not possible.
+    String current = accountPasswords.get(email);
+    if (current != null && MessageDigest.isEqual(current.getBytes(UTF_8), password.getBytes(UTF_8))) {
+      return success(this).build();
+    }
     if (TOM_EMAIL.equals(email)) {
-      String passwordTom = usersToTomPassword.getOrDefault(username, PASSWORD_TOM_9);
-      if (passwordTom.equals(PASSWORD_TOM_9)) {
-        return failed(this).feedback("login_failed").build();
-      } else if (passwordTom.equals(password)) {
-        return success(this).build();
-      }
+      return failed(this).feedback("login_failed").build();
     }
     return failed(this).feedback("login_failed.tom").build();
   }
@@ -110,19 +117,32 @@ public class ResetLinkAssignment implements AssignmentEndpoint {
       modelAndView.setViewName(VIEW_FORMATTER.formatted("password_reset"));
       return modelAndView;
     }
-    if (!resetLinks.contains(form.getResetLink())) {
+    // The link belongs to one account. Holding somebody else's link is not enough, only the
+    // owner of that account may change its password.
+    if (!isOwnedBy(form.getResetLink(), username)) {
       modelAndView.setViewName(VIEW_FORMATTER.formatted("password_link_not_found"));
       return modelAndView;
     }
-    if (checkIfLinkIsFromTom(form.getResetLink(), username)) {
-      usersToTomPassword.put(username, form.getPassword());
-    }
+    // ownership is established, so the new password takes effect for that account
+    accountPasswords.put(resetLinkOwners.get(form.getResetLink()), form.getPassword());
+    // and the link is spent after one use
+    resetLinks.remove(form.getResetLink());
+    resetLinkOwners.remove(form.getResetLink());
     modelAndView.setViewName(VIEW_FORMATTER.formatted("success"));
     return modelAndView;
   }
 
-  private boolean checkIfLinkIsFromTom(String resetLinkFromForm, String username) {
-    String resetLink = userToTomResetLink.getOrDefault(username, "unknown");
-    return resetLink.equals(resetLinkFromForm);
+  private boolean isOwnedBy(String resetLinkFromForm, String username) {
+    if (!hasText(resetLinkFromForm) || !hasText(username)) {
+      return false;
+    }
+    String email = resetLinkOwners.get(resetLinkFromForm);
+    if (email == null) {
+      return false;
+    }
+    // The mail lands in the mailbox named by the local part of the address, so only the owner of
+    // that mailbox may redeem it, whichever domain was typed after the @.
+    int index = email.indexOf("@");
+    return username.equals(email.substring(0, index == -1 ? email.length() : index));
   }
 }
