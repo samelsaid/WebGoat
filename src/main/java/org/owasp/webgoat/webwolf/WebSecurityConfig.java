@@ -6,8 +6,6 @@ package org.owasp.webgoat.webwolf;
 
 import lombok.AllArgsConstructor;
 import org.owasp.webgoat.container.AjaxAuthenticationEntryPoint;
-import org.owasp.webgoat.csrf.CsrfExemptions;
-import org.owasp.webgoat.csrf.CsrfTokenCookieFilter;
 import org.owasp.webgoat.webwolf.user.UserService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.annotation.Bean;
@@ -19,11 +17,8 @@ import org.springframework.security.config.annotation.authentication.configurati
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
 import org.springframework.security.core.userdetails.UserDetailsService;
-import org.springframework.security.web.csrf.CookieCsrfTokenRepository;
-import org.springframework.security.web.csrf.CsrfFilter;
-import org.springframework.security.web.csrf.CsrfTokenRequestAttributeHandler;
+import org.springframework.security.crypto.password.NoOpPasswordEncoder;
 import org.springframework.security.web.SecurityFilterChain;
-import org.springframework.security.web.util.matcher.AntPathRequestMatcher;
 
 /** Security configuration for WebWolf. */
 @Configuration
@@ -35,32 +30,21 @@ public class WebSecurityConfig {
 
   @Bean
   public SecurityFilterChain filterChain(HttpSecurity http) throws Exception {
-    var csrfTokenRepository = CookieCsrfTokenRepository.withHttpOnlyFalse();
-    csrfTokenRepository.setCookieCustomizer(cookie -> cookie.sameSite("Strict"));
-
     return http.authorizeHttpRequests(
             auth -> {
               auth.requestMatchers("/css/**", "/webjars/**", "/favicon.ico", "/js/**", "/images/**")
                   .permitAll();
-              auth.requestMatchers("/csrf/token").permitAll();
-              // "/files/**" used to be in this list, which made every uploaded file world
-              // readable: anyone who could guess or list a name could fetch another user's
-              // uploads without ever authenticating. Retrieval now requires a session, and
-              // FileServer checks that the path belongs to the user asking for it.
               auth.requestMatchers(
-                      HttpMethod.GET, "/fileupload/**", "/landing/**", "/PasswordReset/**")
+                      HttpMethod.GET,
+                      "/fileupload/**",
+                      "/files/**",
+                      "/landing/**",
+                      "/PasswordReset/**")
                   .permitAll();
               auth.requestMatchers(HttpMethod.POST, "/files", "/mail", "/requests").permitAll();
               auth.anyRequest().authenticated();
             })
-        .csrf(
-            csrf ->
-                csrf.csrfTokenRepository(csrfTokenRepository)
-                    .csrfTokenRequestHandler(new CsrfTokenRequestAttributeHandler())
-                    .ignoringRequestMatchers(
-                        CsrfExemptions.headerlessAuthentication("/login"),
-                        new AntPathRequestMatcher("/mail", "POST")))
-        .addFilterAfter(new CsrfTokenCookieFilter(), CsrfFilter.class)
+        .csrf(csrf -> csrf.disable())
         .formLogin(
             login ->
                 login
@@ -95,5 +79,10 @@ public class WebSecurityConfig {
   public AuthenticationManager authenticationManager(
       AuthenticationConfiguration authenticationConfiguration) throws Exception {
     return authenticationConfiguration.getAuthenticationManager();
+  }
+
+  @Bean
+  public NoOpPasswordEncoder passwordEncoder() {
+    return (NoOpPasswordEncoder) NoOpPasswordEncoder.getInstance();
   }
 }
