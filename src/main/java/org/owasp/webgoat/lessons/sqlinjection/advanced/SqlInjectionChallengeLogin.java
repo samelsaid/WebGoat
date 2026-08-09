@@ -7,11 +7,6 @@ package org.owasp.webgoat.lessons.sqlinjection.advanced;
 import static org.owasp.webgoat.container.assignments.AttackResultBuilder.failed;
 import static org.owasp.webgoat.container.assignments.AttackResultBuilder.success;
 
-import java.security.SecureRandom;
-import java.sql.Connection;
-import java.sql.PreparedStatement;
-import java.sql.SQLException;
-import java.util.HexFormat;
 import org.owasp.webgoat.container.LessonDataSource;
 import org.owasp.webgoat.container.assignments.AssignmentEndpoint;
 import org.owasp.webgoat.container.assignments.AttackResult;
@@ -22,10 +17,6 @@ import org.springframework.web.bind.annotation.RestController;
 
 @RestController
 public class SqlInjectionChallengeLogin implements AssignmentEndpoint {
-  private static final String DEFAULT_USER = "tom";
-  private static final String DEFAULT_PASSWORD = "thisisasecretfortomonly";
-  private static final SecureRandom RANDOM = new SecureRandom();
-
   private final LessonDataSource dataSource;
 
   public SqlInjectionChallengeLogin(LessonDataSource dataSource) {
@@ -39,9 +30,6 @@ public class SqlInjectionChallengeLogin implements AssignmentEndpoint {
       @RequestParam("password_login") String password)
       throws Exception {
     try (var connection = dataSource.getConnection()) {
-      if (DEFAULT_USER.equals(username) && DEFAULT_PASSWORD.equals(password)) {
-        return failed(this).feedback("NoResultsMatched").build();
-      }
       var statement =
           connection.prepareStatement(
               "select password from sql_challenge_users where userid = ? and password = ?");
@@ -58,5 +46,4 @@ public class SqlInjectionChallengeLogin implements AssignmentEndpoint {
       }
     }
   }
-
 }
