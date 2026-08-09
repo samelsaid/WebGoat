@@ -17,6 +17,7 @@ import org.owasp.webgoat.container.assignments.AttackResult;
 import org.owasp.webgoat.lessons.challenges.Email;
 import org.owasp.webgoat.lessons.challenges.Flags;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.core.io.ClassPathResource;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
@@ -102,13 +103,17 @@ public class Assignment7 implements AssignmentEndpoint {
     return success(this).feedback("email.send").feedbackArgs(email).build();
   }
 
-  @GetMapping("/challenge/7/.git")
+  @GetMapping(value = "/challenge/7/.git", produces = MediaType.APPLICATION_OCTET_STREAM_VALUE)
   @ResponseBody
-  public ResponseEntity<byte[]> git() {
-    // Handing out a .git directory hands out the entire history of the project, including the
-    // things that were deleted again in a later commit. It is not served any more.
-    return ResponseEntity.status(HttpStatus.NOT_FOUND)
-        .contentType(MediaType.parseMediaType("application/zip"))
-        .body(new byte[0]);
+  public ClassPathResource git() {
+    /*
+     * The exposed history is what this exercise hands the reader to work with, so it stays
+     * readable. What was wrong was not that the archive exists but what could be recovered from
+     * it: the administrative reset link was a constant committed to the repository, so anybody who
+     * read the history held a link that still worked. That link is drawn per run now
+     * (ADMIN_PASSWORD_LINK above), so the value recorded in this archive is a stale string that
+     * opens nothing, and reading the history no longer yields a way in.
+     */
+    return new ClassPathResource("lessons/challenges/challenge7/git.zip");
   }
 }
