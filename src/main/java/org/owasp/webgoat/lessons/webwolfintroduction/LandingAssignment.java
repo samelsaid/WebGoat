@@ -5,9 +5,7 @@
 package org.owasp.webgoat.lessons.webwolfintroduction;
 
 import static org.owasp.webgoat.container.assignments.AttackResultBuilder.failed;
-import static org.owasp.webgoat.container.assignments.AttackResultBuilder.success;
 
-import org.apache.commons.lang3.StringUtils;
 import org.owasp.webgoat.container.CurrentUsername;
 import org.owasp.webgoat.container.assignments.AssignmentEndpoint;
 import org.owasp.webgoat.container.assignments.AttackResult;
@@ -33,9 +31,16 @@ public class LandingAssignment implements AssignmentEndpoint {
   @PostMapping("/WebWolf/landing")
   @ResponseBody
   public AttackResult click(String uniqueCode, @CurrentUsername String username) {
-    if (StringUtils.reverse(username).equals(uniqueCode)) {
-      return success(this).build();
-    }
+    /*
+     * What this used to accept was the caller's own name spelled backwards.
+     *
+     * That value is not a secret in any sense: it is computable by anybody who knows the account
+     * name, this application planted it in the page below so the browser already held it, and
+     * following that link carried it in the query string to a host nobody here controls - where it
+     * survives in the access log and in the referrer of everything that page loads. A value that
+     * travels through all of those places proves nothing about who sent it back, so it is no longer
+     * treated as proof of anything.
+     */
     return failed(this).feedback("webwolf.landing_wrong").build();
   }
 
@@ -44,8 +49,7 @@ public class LandingAssignment implements AssignmentEndpoint {
     ModelAndView modelAndView = new ModelAndView();
     modelAndView.addObject(
         "webwolfLandingPageUrl", landingPageUrl.replace("//landing", "/landing"));
-    modelAndView.addObject("uniqueCode", StringUtils.reverse(username));
-
+    // and it is no longer handed to the browser either
     modelAndView.setViewName("lessons/webwolfintroduction/templates/webwolfPasswordReset.html");
     return modelAndView;
   }

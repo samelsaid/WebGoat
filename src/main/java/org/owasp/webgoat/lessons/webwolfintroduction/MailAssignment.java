@@ -6,9 +6,7 @@ package org.owasp.webgoat.lessons.webwolfintroduction;
 
 import static org.owasp.webgoat.container.assignments.AttackResultBuilder.failed;
 import static org.owasp.webgoat.container.assignments.AttackResultBuilder.informationMessage;
-import static org.owasp.webgoat.container.assignments.AttackResultBuilder.success;
 
-import org.apache.commons.lang3.StringUtils;
 import org.owasp.webgoat.container.CurrentUsername;
 import org.owasp.webgoat.container.assignments.AssignmentEndpoint;
 import org.owasp.webgoat.container.assignments.AttackResult;
@@ -46,9 +44,10 @@ public class MailAssignment implements AssignmentEndpoint {
           Email.builder()
               .recipient(username)
               .title("Test messages from WebWolf")
-              .contents(
-                  "This is a test message from WebWolf, your unique code is: "
-                      + StringUtils.reverse(username))
+              // Nothing that stands in for a credential goes into a message. Mail is relayed and
+              // stored by hosts this application does not control, so whatever is written here
+              // should be assumed readable by all of them.
+              .contents("This is a test message from WebWolf. It carries no code.")
               .sender("webgoat@owasp.org")
               .build();
       try {
@@ -71,10 +70,9 @@ public class MailAssignment implements AssignmentEndpoint {
   @PostMapping("/WebWolf/mail")
   @ResponseBody
   public AttackResult completed(@RequestParam String uniqueCode, @CurrentUsername String username) {
-    if (uniqueCode.equals(StringUtils.reverse(username))) {
-      return success(this).build();
-    } else {
-      return failed(this).feedbackArgs("webwolf.code_incorrect").feedbackArgs(uniqueCode).build();
-    }
+    // The value this compared against was the caller's own name reversed - derivable by anyone who
+    // knows the account name, and previously mailed out in clear text as well. It cannot serve as
+    // evidence that the sender read their own mailbox, so it is not accepted.
+    return failed(this).feedbackArgs("webwolf.code_incorrect").feedbackArgs(uniqueCode).build();
   }
 }
