@@ -11,7 +11,6 @@ import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.security.SecureRandom;
-import java.util.Base64;
 import java.util.HashMap;
 import java.util.Map;
 import org.owasp.webgoat.container.assignments.AssignmentEndpoint;
@@ -30,20 +29,31 @@ public class IDORLogin implements AssignmentEndpoint {
 
   private final Map<String, Map<String, String>> idorUserInfo = new HashMap<>();
 
-  // The account password is not written anywhere in this repository. It is drawn from
-  // SecureRandom at startup and only a salted digest of it is kept, and the comparison runs in
-  // constant time so it does not leak the value one byte at a time.
+  /*
+   * The credential this lesson documents, kept as documented.
+   *
+   * Drawing it from SecureRandom instead made the account impossible to sign in to for anybody,
+   * which does not harden anything: "tom" is not an account in this application, it is an entry in
+   * the map below that exists so the exercise has somebody to be. The whole subject of the lesson
+   * is that a shop stored a weak password in the clear, and the reader is told what it is - it is
+   * the exercise's input, not a secret, and it authenticates nothing outside these few endpoints.
+   * Withholding it only removed the way in, and every later step of the family is reached through
+   * this sign-in.
+   *
+   * What is worth keeping from the previous attempt is the shape of the comparison, so the digest
+   * of the documented value is what gets compared, in constant time.
+   */
+  private static final String LESSON_USER = "tom";
+  private static final String LESSON_PASSWORD = "cat";
+
   private final byte[] salt = new byte[16];
   private final byte[] passwordHash;
 
   public IDORLogin(LessonSession lessonSession) {
     this.lessonSession = lessonSession;
 
-    SecureRandom secureRandom = new SecureRandom();
-    secureRandom.nextBytes(salt);
-    byte[] secret = new byte[32];
-    secureRandom.nextBytes(secret);
-    this.passwordHash = hash(Base64.getEncoder().encodeToString(secret));
+    new SecureRandom().nextBytes(salt);
+    this.passwordHash = hash(LESSON_PASSWORD);
   }
 
   public void initIDORInfo() {
@@ -64,9 +74,7 @@ public class IDORLogin implements AssignmentEndpoint {
   public AttackResult completed(@RequestParam String username, @RequestParam String password) {
     initIDORInfo();
 
-    if (idorUserInfo.containsKey(username)
-        && "tom".equals(username)
-        && MessageDigest.isEqual(passwordHash, hash(password))) {
+    if (LESSON_USER.equals(username) && MessageDigest.isEqual(passwordHash, hash(password))) {
       lessonSession.setValue("idor-authenticated-as", username);
       lessonSession.setValue("idor-authenticated-user-id", idorUserInfo.get(username).get("id"));
       return success(this).feedback("idor.login.success").feedbackArgs(username).build();
