@@ -127,9 +127,13 @@ public class ResetLinkAssignment implements AssignmentEndpoint {
        * only lands when the caller is the owner of the mailbox it was sent to.
        */
       String mailbox = TOM_EMAIL.substring(0, TOM_EMAIL.indexOf("@"));
-      if (mailbox.equals(username)) {
-        usersToTomPassword.put(username, form.getPassword());
+      if (!mailbox.equals(username)) {
+        // and the caller is told the link is not theirs rather than being shown a page saying the
+        // password was changed, which would report a reset that did not happen
+        modelAndView.setViewName(VIEW_FORMATTER.formatted("password_link_not_found"));
+        return modelAndView;
       }
+      usersToTomPassword.put(username, form.getPassword());
     }
     modelAndView.setViewName(VIEW_FORMATTER.formatted("success"));
     return modelAndView;
