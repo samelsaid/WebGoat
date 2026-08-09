@@ -115,7 +115,21 @@ public class ResetLinkAssignment implements AssignmentEndpoint {
       return modelAndView;
     }
     if (checkIfLinkIsFromTom(form.getResetLink(), username)) {
-      usersToTomPassword.put(username, form.getPassword());
+      /*
+       * A reset link addressed to tom@webgoat-cloud.org only sets that account's password for the
+       * person who owns that mailbox.
+       *
+       * Every step up to here was reachable by anybody who asked for a link for that address:
+       * the link was created for them, delivered, and redeemed, and then this line wrote the new
+       * password in under their own name, which the sign-in below accepts for Tom's address. That
+       * is the takeover - a reset performed by one user changing what another user's account
+       * answers to. Holding a link is not evidence of owning the account it names, so the change
+       * only lands when the caller is the owner of the mailbox it was sent to.
+       */
+      String mailbox = TOM_EMAIL.substring(0, TOM_EMAIL.indexOf("@"));
+      if (mailbox.equals(username)) {
+        usersToTomPassword.put(username, form.getPassword());
+      }
     }
     modelAndView.setViewName(VIEW_FORMATTER.formatted("success"));
     return modelAndView;
